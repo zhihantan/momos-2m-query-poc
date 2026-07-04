@@ -112,6 +112,23 @@ databricks bundle run momos_generate_data -t dev -p fe-vm-zh-serverless --params
 Or open **`notebooks/00_quickstart.py`** and Run All for the whole thing at `sf1`
 scale in one notebook.
 
+**Single-job distributed generator:** the `momos_benchmark_distributed` job
+(`notebooks/04_run_benchmark_distributed.py`) fans the load across Spark
+**executors** via `mapInPandas` (self-contained worker — no `src` needed on
+executors). It records the executor `node` per query, so `count(distinct node)`
+tells you if you actually got multi-node.
+
+```bash
+databricks bundle run momos_benchmark_distributed -t dev -p fe-vm-zh-serverless
+```
+
+> **Compute matters** (measured — see [docs/tuning.md §7](docs/tuning.md)): on a
+> **classic multi-node cluster** this fans across real nodes → thousands of QPS
+> from one job. On a **serverless-only** workspace, serverless kept it on **one
+> node** (no multi-node scale-out for this I/O-bound job), so there the reliable
+> way to multi-node is the **N-parallel-jobs** pattern (several `momos_benchmark`
+> runs sharing a `run_tag`) — which is how the live 2M run reached ~528 QPS.
+
 ### The dashboard
 
 The bundle deploys an **AI/BI dashboard** ("Momos · 2M Queries") that auto-targets
@@ -147,9 +164,9 @@ src/
   config/config.yaml      single source of truth (scale, warehouse, benchmark knobs)
   common/config.py        config loading + run-tag marker
   data_generation/        Spark synthesis of the star schema
-  workload/               query_templates · param_sampler · load_generator
+  workload/               query_templates · param_sampler · load_generator · distributed
   analysis/               metrics (query.history) · cost (billing.usage)
-notebooks/                00_quickstart · 01_generate · 02_benchmark · 03_analyze
+notebooks/                00_quickstart · 01_generate · 02_benchmark · 03_analyze · 04_benchmark_distributed
 dashboards/               query_throughput.lvdash.json
 docs/                     architecture · tuning · results
 scripts/                  setup · run_benchmark · teardown

@@ -44,3 +44,33 @@ resources:
               bundle_root: ${workspace.file_path}
               warehouse_id: ${resources.sql_warehouses.momos_wh.id}
           # No cluster block -> serverless.
+
+    # Single-job, executor-distributed generator: mapInPandas fans thread pools
+    # across serverless executors, so ONE job scales past the ~150 QPS/node cap.
+    momos_benchmark_distributed:
+      name: momos_benchmark_distributed
+      tasks:
+        - task_key: run_benchmark_distributed
+          notebook_task:
+            notebook_path: ../notebooks/04_run_benchmark_distributed.py
+            base_parameters:
+              bundle_root: ${workspace.file_path}
+              warehouse_id: ${resources.sql_warehouses.momos_wh.id}
+              mode: serving
+              scale: full
+              # Serverless-only here keeps mapInPandas on ONE node, so size the
+              # partitions to ~one node's cores (single wave). On a CLASSIC
+              # multi-node cluster, raise num_partitions >> total cores to fan out.
+              num_partitions: "24"
+              threads_per_partition: "8"
+              duration_seconds: "600"
+              pace: "false"
+          # No cluster block -> serverless (see docs/tuning.md §7 for the multi-node caveat).
+        - task_key: analyze
+          depends_on:
+            - task_key: run_benchmark_distributed
+          notebook_task:
+            notebook_path: ../notebooks/03_analyze_results.py
+            base_parameters:
+              bundle_root: ${workspace.file_path}
+              warehouse_id: ${resources.sql_warehouses.momos_wh.id}

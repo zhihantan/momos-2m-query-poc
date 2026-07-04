@@ -113,3 +113,4 @@ tables:
   reviews: customer_reviews
   run_registry: benchmark_runs         # one row per benchmark run (config + totals)
   query_log: benchmark_query_log       # per-query client-observed latency/status
+  query_log_dist: benchmark_query_log_dist  # distributed generator log (adds executor node)

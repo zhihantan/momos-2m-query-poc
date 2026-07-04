@@ -68,12 +68,44 @@ results: `pruned_files / (pruned_files + read_files)`. Keep result sets tiny
   **REST API** rate limits, which matters at hundreds of QPS. If you switch to the
   REST API, check per-workspace limits first.
 
-## 7. Going beyond one node (thousands of QPS)
+## 7. Going beyond one node — the distributed generator (implemented)
 
-Wrap the per-thread loop in `df.mapInPandas(...)` over a DataFrame with one row per
-worker, so the thread pools run across Spark executors. On this serverless-only
-workspace that requires packaging `src/` (a wheel or `%pip`-installed module) so
-executors can import it. For 556 QPS it is unnecessary — a single node suffices.
+`src/workload/distributed.py` + notebook `04_run_benchmark_distributed.py` (job
+`momos_benchmark_distributed`) fan the per-thread loop across Spark **executors**
+via `mapInPandas`, so **one job** scales past the ~150 QPS single-node cap.
+
+Two things make it work:
+- **The worker is self-contained.** Executor Python workers don't have `src` on
+  their path, so the driver pre-renders the whole workload into plain picklable
+  data (concrete SQL + which params are bound) and captures it in the worker
+  closure. The worker imports only `databricks.sql` (a `%pip` package that *is*
+  available to UDF workers) and the stdlib — never `src`. This part is verified
+  on serverless (connector imports and queries fine from executor workers).
+- **Concurrency = `num_partitions × threads_per_partition`,** spread across
+  whatever executors the compute provides.
+
+### ⚠️ Measured caveat on serverless-only workspaces
+
+On this FE-VM (serverless-only) workspace, serverless **did not scale
+`mapInPandas` across multiple nodes** for this I/O-bound job — it kept everything
+on **one node** (`count(distinct node) = 1`) and ran the partitions in *waves*
+(96 partitions × 180s ran in ~828s of wall time). Net: on serverless-only,
+`mapInPandas` maxes a single node (~220 QPS — a bit above the driver pool's ~150,
+since it uses more cores), it does **not** give multi-node scale-out.
+
+So pick your generator by compute type:
+- **Classic multi-node cluster** (most customer workspaces): this same code fans
+  the thread pools across real executor nodes → thousands of QPS from one job.
+  Keep `num_partitions` ≫ total cores.
+- **Serverless-only** (this workspace): use the **N-parallel-jobs** pattern
+  instead — launch several `momos_benchmark` runs sharing one `run_tag`; each gets
+  its own node, and `system.query.history` aggregates them (this is how the live
+  2M run hit ~528 QPS). For the distributed job here, set `num_partitions` ≈ one
+  node's cores so it runs in a single wave rather than queuing.
+
+The distributed log (`benchmark_query_log_dist`) records the executor `node` per
+query, so `count(distinct node)` tells you immediately whether you actually got
+multi-node — no waiting for `query.history` ingestion.
 
 ## 8. Serverless gotchas we hit (so you don't)
 
