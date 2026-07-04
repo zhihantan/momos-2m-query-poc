@@ -1,0 +1,115 @@
+# ======================================================================
+# Momos · 2 Million SQL Queries in 60 Minutes on Databricks Serverless SQL
+# ----------------------------------------------------------------------
+# Single source of truth for the benchmark. Job/task parameters (widgets)
+# override any value here at runtime, so the same code runs the cheap
+# smoke test and the full showcase without edits.
+# ======================================================================
+
+# ----------------------------------------------------------------------
+# Databricks connection & data location
+# ----------------------------------------------------------------------
+databricks:
+  profile: fe-vm-zh-serverless
+  host: https://fe-vm-zh-serverless-ws.cloud.databricks.com
+  catalog: zh_serverless_ws        # reuse existing FE-VM managed catalog
+  schema: momos_cx                 # customer-experience star schema lives here
+
+# ----------------------------------------------------------------------
+# Serverless SQL Warehouse under test
+# Design note: for MANY SMALL queries you scale OUT (more clusters), not
+# UP (bigger size). Databricks targets ~10 concurrent queries per cluster,
+# so max_clusters * 10 is the concurrency ceiling.
+# ----------------------------------------------------------------------
+warehouse:
+  name: momos-benchmark-wh
+  size: Small                      # start small; scale-out via clusters
+  min_clusters: 1                  # cheap default; bump to 4-6 as a WARM FLOOR for the full 2M run
+  max_clusters: 20                 # ~200 concurrent-query ceiling
+  auto_stop_minutes: 10            # cost guardrail
+  enable_serverless: true
+  enable_photon: true
+  # For the live "watch it autoscale from cold" story, set min_clusters: 1
+
+# ----------------------------------------------------------------------
+# Data scale profiles.  active_scale selects one; job param can override.
+#   sf1  -> cheap, fast, the repo default (safe first run)
+#   full -> the documented showcase scale for the real 2M-query run
+# ----------------------------------------------------------------------
+active_scale: sf1
+scale_profiles:
+  sf1:
+    products: 1000
+    profiles: 100000
+    orders: 1000000
+    reviews: 500000
+  full:                   # showcase scale used for the live headline run
+    products: 20000
+    profiles: 2000000
+    orders: 25000000
+    reviews: 12000000
+
+# ----------------------------------------------------------------------
+# Benchmark / load generator
+# ----------------------------------------------------------------------
+benchmark:
+  # Headline goal
+  target_total_queries: 2000000
+  duration_seconds: 3600           # 60 minutes
+  target_qps: 556                  # 2,000,000 / 3,600 (ceil)
+
+  # Workload character
+  mode: compute                    # compute = uniform params (cache-busting, honest compute stress)
+                                   # serving = hot-set params (cache-friendly, real app/dashboard pattern)
+  hot_set_size: 2000               # size of the "hot" key pool used in serving mode
+  result_row_limit: 100            # LIMIT on every template -> measure engine throughput, not transfer
+  template_weights_profile: mixed  # see query_templates.py (mixed | serving_heavy | analytics_heavy)
+  client_log_sample_rate: 1.0      # fraction of OK queries logged client-side (errors always logged);
+                                   # lower it (e.g. 0.1) on the full 2M run to bound driver memory
+
+  # Client-side parallelism (runs on a CLASSIC cluster for predictable concurrency)
+  #   in-flight concurrency ~= num_partitions * threads_per_partition
+  num_partitions: 32               # ~= load-gen cluster total cores (1 Spark task per core)
+  threads_per_partition: 8         # concurrency multiplier per task
+  pace: true                       # true = pace to target_qps; false = unleashed (find max QPS)
+
+  # Bookkeeping
+  run_tag_prefix: momos_bench      # injected as a SQL comment so system.query.history can be filtered exactly
+
+  # Small live validation run (used by the smoke task before the big run)
+  smoke:
+    duration_seconds: 300          # 5 minutes
+    target_qps: 60
+    num_partitions: 8
+    threads_per_partition: 4
+
+# ----------------------------------------------------------------------
+# Table names (relative to catalog.schema)
+# ----------------------------------------------------------------------
+# ----------------------------------------------------------------------
+# Pricing for cost estimation (LIST price — verify for your region/contract).
+# DBU/hr per serverless SQL warehouse size is multiplied by active clusters.
+# ----------------------------------------------------------------------
+pricing:
+  serverless_sql_dollars_per_dbu: 0.70
+  dbu_per_hour_by_size:
+    2X-Small: 4
+    X-Small: 6
+    Small: 12
+    Medium: 24
+    Large: 40
+    X-Large: 80
+    2X-Large: 144
+    3X-Large: 280
+    4X-Large: 528
+
+# ----------------------------------------------------------------------
+# Table names (relative to catalog.schema)
+# ----------------------------------------------------------------------
+tables:
+  products: products
+  profiles: customer_profiles
+  orders: customer_orders
+  reviews: customer_reviews
+  run_registry: benchmark_runs         # one row per benchmark run (config + totals)
+  query_log: benchmark_query_log       # per-query client-observed latency/status

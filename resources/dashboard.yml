@@ -1,0 +1,9 @@
+# AI/BI (Lakeview) dashboard. Datasets auto-target the latest run in
+# benchmark_runs, so it shows whatever run finished most recently.
+resources:
+  dashboards:
+    momos_dashboard:
+      display_name: "Momos - 2M Queries on Serverless SQL"
+      file_path: ../dashboards/query_throughput.lvdash.json
+      warehouse_id: ${resources.sql_warehouses.momos_wh.id}
+      parent_path: ${workspace.file_path}

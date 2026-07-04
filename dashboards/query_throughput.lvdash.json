@@ -1,0 +1,179 @@
+{
+  "datasets": [
+    {
+      "name": "ds_headline",
+      "displayName": "Headline (latest run)",
+      "queryLines": [
+        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = (SELECT run_tag FROM zh_serverless_ws.momos_cx.benchmark_runs ORDER BY start_ts DESC LIMIT 1) GROUP BY run_tag), ",
+        "h AS (SELECT q.* FROM system.query.history q, latest l ",
+        "  WHERE q.statement_text LIKE ('/* ' || l.run_tag || ' %') ",
+        "    AND q.start_time BETWEEN l.start_ts - INTERVAL 5 MINUTES AND l.end_ts + INTERVAL 5 MINUTES) ",
+        "SELECT count(*) AS total_queries, ",
+        "  round(count(*) / nullif(unix_timestamp(max(end_time)) - unix_timestamp(min(start_time)), 0), 1) AS achieved_qps, ",
+        "  round((unix_timestamp(max(end_time)) - unix_timestamp(min(start_time))) / 60.0, 1) AS span_min, ",
+        "  percentile_approx(total_duration_ms, 0.5) AS p50_ms, ",
+        "  percentile_approx(total_duration_ms, 0.99) AS p99_ms, ",
+        "  round(avg(CASE WHEN from_result_cache THEN 1 ELSE 0 END) * 100, 1) AS cache_hit_pct, ",
+        "  round(sum(read_bytes) / 1e9, 2) AS gb_read ",
+        "FROM h"
+      ]
+    },
+    {
+      "name": "ds_qps",
+      "displayName": "QPS over time",
+      "queryLines": [
+        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = (SELECT run_tag FROM zh_serverless_ws.momos_cx.benchmark_runs ORDER BY start_ts DESC LIMIT 1) GROUP BY run_tag) ",
+        "SELECT date_trunc('SECOND', q.start_time) AS ts, count(*) AS qps ",
+        "FROM system.query.history q, latest l ",
+        "WHERE q.statement_text LIKE ('/* ' || l.run_tag || ' %') ",
+        "  AND q.start_time BETWEEN l.start_ts - INTERVAL 5 MINUTES AND l.end_ts + INTERVAL 5 MINUTES ",
+        "GROUP BY 1 ORDER BY 1"
+      ]
+    },
+    {
+      "name": "ds_cumulative",
+      "displayName": "Cumulative queries",
+      "queryLines": [
+        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = (SELECT run_tag FROM zh_serverless_ws.momos_cx.benchmark_runs ORDER BY start_ts DESC LIMIT 1) GROUP BY run_tag), ",
+        "per_sec AS (SELECT date_trunc('SECOND', q.start_time) AS ts, count(*) AS qps ",
+        "  FROM system.query.history q, latest l ",
+        "  WHERE q.statement_text LIKE ('/* ' || l.run_tag || ' %') ",
+        "    AND q.start_time BETWEEN l.start_ts - INTERVAL 5 MINUTES AND l.end_ts + INTERVAL 5 MINUTES ",
+        "  GROUP BY 1) ",
+        "SELECT ts, sum(qps) OVER (ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_queries ",
+        "FROM per_sec ORDER BY ts"
+      ]
+    },
+    {
+      "name": "ds_per_template",
+      "displayName": "Per-template",
+      "queryLines": [
+        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = (SELECT run_tag FROM zh_serverless_ws.momos_cx.benchmark_runs ORDER BY start_ts DESC LIMIT 1) GROUP BY run_tag) ",
+        "SELECT regexp_extract(q.statement_text, 'tpl=([a-zA-Z0-9_]+)', 1) AS template_id, ",
+        "  count(*) AS queries, ",
+        "  percentile_approx(total_duration_ms, 0.5) AS p50_ms, ",
+        "  percentile_approx(total_duration_ms, 0.99) AS p99_ms ",
+        "FROM system.query.history q, latest l ",
+        "WHERE q.statement_text LIKE ('/* ' || l.run_tag || ' %') ",
+        "  AND q.start_time BETWEEN l.start_ts - INTERVAL 5 MINUTES AND l.end_ts + INTERVAL 5 MINUTES ",
+        "GROUP BY 1 ORDER BY queries DESC"
+      ]
+    },
+    {
+      "name": "ds_scaling",
+      "displayName": "Warehouse autoscaling",
+      "queryLines": [
+        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = (SELECT run_tag FROM zh_serverless_ws.momos_cx.benchmark_runs ORDER BY start_ts DESC LIMIT 1) GROUP BY run_tag), ",
+        "whid AS (SELECT DISTINCT q.compute.warehouse_id AS wid FROM system.query.history q, latest l ",
+        "  WHERE q.statement_text LIKE ('/* ' || l.run_tag || ' %') AND q.compute.warehouse_id IS NOT NULL) ",
+        "SELECT we.event_time AS ts, we.cluster_count AS clusters ",
+        "FROM system.compute.warehouse_events we, latest l, whid ",
+        "WHERE we.warehouse_id = whid.wid ",
+        "  AND we.event_time BETWEEN l.start_ts - INTERVAL 3 MINUTES AND l.end_ts + INTERVAL 3 MINUTES ",
+        "ORDER BY we.event_time"
+      ]
+    },
+    {
+      "name": "ds_cache",
+      "displayName": "Cache hit vs compute",
+      "queryLines": [
+        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = (SELECT run_tag FROM zh_serverless_ws.momos_cx.benchmark_runs ORDER BY start_ts DESC LIMIT 1) GROUP BY run_tag) ",
+        "SELECT CASE WHEN q.from_result_cache THEN 'cache hit' ELSE 'compute' END AS source, count(*) AS queries ",
+        "FROM system.query.history q, latest l ",
+        "WHERE q.statement_text LIKE ('/* ' || l.run_tag || ' %') ",
+        "  AND q.start_time BETWEEN l.start_ts - INTERVAL 5 MINUTES AND l.end_ts + INTERVAL 5 MINUTES ",
+        "GROUP BY 1"
+      ]
+    },
+    {
+      "name": "ds_runs",
+      "displayName": "Recent runs",
+      "queryLines": [
+        "SELECT run_tag, mode, scale, concurrency, target_qps, client_total, round(client_qps,1) AS client_qps, client_errors, start_ts ",
+        "FROM zh_serverless_ws.momos_cx.benchmark_runs ORDER BY start_ts DESC LIMIT 10"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "overview",
+      "displayName": "2M Queries / 60 min",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {"name": "title", "multilineTextboxSpec": {"lines": ["# Momos · 2 Million Queries on Databricks Serverless SQL"]}},
+          "position": {"x": 0, "y": 0, "width": 6, "height": 1}
+        },
+        {
+          "widget": {"name": "subtitle", "multilineTextboxSpec": {"lines": ["Latest run — counted and measured from system.query.history (the platform's own audit log)."]}},
+          "position": {"x": 0, "y": 1, "width": 6, "height": 1}
+        },
+        {
+          "widget": {"name": "kpi-total", "queries": [{"name": "main_query", "query": {"datasetName": "ds_headline", "fields": [{"name": "total_queries", "expression": "`total_queries`"}], "disaggregated": true}}], "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "total_queries", "displayName": "Total queries"}}, "frame": {"showTitle": true, "title": "Total queries (proven)"}}},
+          "position": {"x": 0, "y": 2, "width": 2, "height": 3}
+        },
+        {
+          "widget": {"name": "kpi-qps", "queries": [{"name": "main_query", "query": {"datasetName": "ds_headline", "fields": [{"name": "achieved_qps", "expression": "`achieved_qps`"}], "disaggregated": true}}], "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "achieved_qps", "displayName": "Achieved QPS"}}, "frame": {"showTitle": true, "title": "Achieved QPS"}}},
+          "position": {"x": 2, "y": 2, "width": 2, "height": 3}
+        },
+        {
+          "widget": {"name": "kpi-span", "queries": [{"name": "main_query", "query": {"datasetName": "ds_headline", "fields": [{"name": "span_min", "expression": "`span_min`"}], "disaggregated": true}}], "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "span_min", "displayName": "Span (min)"}}, "frame": {"showTitle": true, "title": "Wall span (minutes)"}}},
+          "position": {"x": 4, "y": 2, "width": 2, "height": 3}
+        },
+        {
+          "widget": {"name": "kpi-p50", "queries": [{"name": "main_query", "query": {"datasetName": "ds_headline", "fields": [{"name": "p50_ms", "expression": "`p50_ms`"}], "disaggregated": true}}], "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "p50_ms", "displayName": "p50 ms"}}, "frame": {"showTitle": true, "title": "Latency p50 (ms)"}}},
+          "position": {"x": 0, "y": 5, "width": 2, "height": 3}
+        },
+        {
+          "widget": {"name": "kpi-p99", "queries": [{"name": "main_query", "query": {"datasetName": "ds_headline", "fields": [{"name": "p99_ms", "expression": "`p99_ms`"}], "disaggregated": true}}], "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "p99_ms", "displayName": "p99 ms"}}, "frame": {"showTitle": true, "title": "Latency p99 (ms)"}}},
+          "position": {"x": 2, "y": 5, "width": 2, "height": 3}
+        },
+        {
+          "widget": {"name": "kpi-cache", "queries": [{"name": "main_query", "query": {"datasetName": "ds_headline", "fields": [{"name": "cache_hit_pct", "expression": "`cache_hit_pct`"}], "disaggregated": true}}], "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "cache_hit_pct", "displayName": "Cache hit %"}}, "frame": {"showTitle": true, "title": "Result-cache hit %"}}},
+          "position": {"x": 4, "y": 5, "width": 2, "height": 3}
+        },
+        {
+          "widget": {"name": "hdr-cumulative", "multilineTextboxSpec": {"lines": ["## Cumulative progress toward 2,000,000"]}},
+          "position": {"x": 0, "y": 8, "width": 6, "height": 1}
+        },
+        {
+          "widget": {"name": "chart-cumulative", "queries": [{"name": "main_query", "query": {"datasetName": "ds_cumulative", "fields": [{"name": "ts", "expression": "`ts`"}, {"name": "sum(cumulative_queries)", "expression": "SUM(`cumulative_queries`)"}], "disaggregated": false}}], "spec": {"version": 3, "widgetType": "area", "encodings": {"x": {"fieldName": "ts", "scale": {"type": "temporal"}, "displayName": "Time"}, "y": {"fieldName": "sum(cumulative_queries)", "scale": {"type": "quantitative"}, "displayName": "Cumulative queries"}}, "frame": {"showTitle": true, "title": "Cumulative queries executed"}, "mark": {"colors": ["#FF3621"]}}},
+          "position": {"x": 0, "y": 9, "width": 6, "height": 5}
+        },
+        {
+          "widget": {"name": "hdr-throughput", "multilineTextboxSpec": {"lines": ["## Throughput & autoscaling"]}},
+          "position": {"x": 0, "y": 14, "width": 6, "height": 1}
+        },
+        {
+          "widget": {"name": "chart-qps", "queries": [{"name": "main_query", "query": {"datasetName": "ds_qps", "fields": [{"name": "ts", "expression": "`ts`"}, {"name": "sum(qps)", "expression": "SUM(`qps`)"}], "disaggregated": false}}], "spec": {"version": 3, "widgetType": "line", "encodings": {"x": {"fieldName": "ts", "scale": {"type": "temporal"}, "displayName": "Time"}, "y": {"fieldName": "sum(qps)", "scale": {"type": "quantitative"}, "displayName": "Queries / sec"}}, "frame": {"showTitle": true, "title": "Queries per second"}, "mark": {"colors": ["#00A972"]}}},
+          "position": {"x": 0, "y": 15, "width": 3, "height": 5}
+        },
+        {
+          "widget": {"name": "chart-scaling", "queries": [{"name": "main_query", "query": {"datasetName": "ds_scaling", "fields": [{"name": "ts", "expression": "`ts`"}, {"name": "max(clusters)", "expression": "MAX(`clusters`)"}], "disaggregated": false}}], "spec": {"version": 3, "widgetType": "line", "encodings": {"x": {"fieldName": "ts", "scale": {"type": "temporal"}, "displayName": "Time"}, "y": {"fieldName": "max(clusters)", "scale": {"type": "quantitative"}, "displayName": "Active clusters"}}, "frame": {"showTitle": true, "title": "Warehouse clusters (autoscaling)"}, "mark": {"colors": ["#8BCAE7"]}}},
+          "position": {"x": 3, "y": 15, "width": 3, "height": 5}
+        },
+        {
+          "widget": {"name": "hdr-latency", "multilineTextboxSpec": {"lines": ["## Latency by query type & cache"]}},
+          "position": {"x": 0, "y": 20, "width": 6, "height": 1}
+        },
+        {
+          "widget": {"name": "chart-tpl", "queries": [{"name": "main_query", "query": {"datasetName": "ds_per_template", "fields": [{"name": "template_id", "expression": "`template_id`"}, {"name": "sum(queries)", "expression": "SUM(`queries`)"}], "disaggregated": false}}], "spec": {"version": 3, "widgetType": "bar", "encodings": {"x": {"fieldName": "template_id", "scale": {"type": "categorical", "sort": {"by": "y-reversed"}}, "displayName": "Template"}, "y": {"fieldName": "sum(queries)", "scale": {"type": "quantitative"}, "displayName": "Queries"}}, "frame": {"showTitle": true, "title": "Queries by template"}, "mark": {"colors": ["#FFAB00"]}}},
+          "position": {"x": 0, "y": 21, "width": 3, "height": 6}
+        },
+        {
+          "widget": {"name": "chart-cache", "queries": [{"name": "main_query", "query": {"datasetName": "ds_cache", "fields": [{"name": "source", "expression": "`source`"}, {"name": "sum(queries)", "expression": "SUM(`queries`)"}], "disaggregated": false}}], "spec": {"version": 3, "widgetType": "pie", "encodings": {"angle": {"fieldName": "sum(queries)", "scale": {"type": "quantitative"}, "displayName": "Queries"}, "color": {"fieldName": "source", "scale": {"type": "categorical"}, "displayName": "Source"}}, "frame": {"showTitle": true, "title": "Cache hit vs compute"}}},
+          "position": {"x": 3, "y": 21, "width": 3, "height": 6}
+        },
+        {
+          "widget": {"name": "hdr-runs", "multilineTextboxSpec": {"lines": ["## Recent runs"]}},
+          "position": {"x": 0, "y": 27, "width": 6, "height": 1}
+        },
+        {
+          "widget": {"name": "table-runs", "queries": [{"name": "main_query", "query": {"datasetName": "ds_runs", "fields": [{"name": "run_tag", "expression": "`run_tag`"}, {"name": "mode", "expression": "`mode`"}, {"name": "scale", "expression": "`scale`"}, {"name": "concurrency", "expression": "`concurrency`"}, {"name": "target_qps", "expression": "`target_qps`"}, {"name": "client_total", "expression": "`client_total`"}, {"name": "client_qps", "expression": "`client_qps`"}, {"name": "client_errors", "expression": "`client_errors`"}, {"name": "start_ts", "expression": "`start_ts`"}], "disaggregated": true}}], "spec": {"version": 2, "widgetType": "table", "encodings": {"columns": [{"fieldName": "run_tag", "displayName": "Run"}, {"fieldName": "mode", "displayName": "Mode"}, {"fieldName": "scale", "displayName": "Scale"}, {"fieldName": "concurrency", "displayName": "Concurrency"}, {"fieldName": "target_qps", "displayName": "Target QPS"}, {"fieldName": "client_total", "displayName": "Client total"}, {"fieldName": "client_qps", "displayName": "Client QPS"}, {"fieldName": "client_errors", "displayName": "Errors"}, {"fieldName": "start_ts", "displayName": "Start"}]}, "frame": {"showTitle": true, "title": "Runs"}}},
+          "position": {"x": 0, "y": 28, "width": 6, "height": 6}
+        }
+      ]
+    }
+  ],
+  "uiSettings": {"theme": {"widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"}}
+}

@@ -1,0 +1,20 @@
+# The serverless SQL Warehouse under test.
+# Design: scale OUT (clusters), not UP (size). Small size + high max_num_clusters
+# gives a ~200 concurrent-query ceiling (~10/cluster). A warm floor
+# (min_num_clusters) avoids a cold autoscale ramp eating into the 60 minutes.
+# Keep these values in sync with warehouse.* in src/config/config.yaml.
+resources:
+  sql_warehouses:
+    momos_wh:
+      name: momos-benchmark-wh
+      warehouse_type: PRO
+      enable_serverless_compute: true
+      enable_photon: true
+      cluster_size: Small
+      min_num_clusters: 1          # cheap default; bump to 4-6 as a WARM FLOOR for the full 2M run
+      max_num_clusters: 20         # ~200 concurrent-query ceiling (~10/cluster)
+      auto_stop_mins: 10           # cost guardrail
+      tags:
+        custom_tags:
+          - key: project
+            value: momos-2m-query-poc

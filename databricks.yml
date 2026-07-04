@@ -1,0 +1,20 @@
+# Databricks Asset Bundle — one command deploys the whole showcase:
+#   databricks bundle deploy -t dev -p fe-vm-zh-serverless
+#
+# Resources: the serverless SQL warehouse under test, the data-gen job
+# (serverless), the benchmark job (single-node classic + analyze), and the
+# AI/BI dashboard. Names are literal (no dev-mode prefixing) so the Python in
+# src/ can find the warehouse by the name in config.yaml — deploy one copy per
+# workspace.
+bundle:
+  name: momos_2m_query_poc
+
+include:
+  - resources/*.yml
+
+# Keep resource names literal and stable across deploys.
+targets:
+  dev:
+    default: true
+    workspace:
+      host: https://fe-vm-zh-serverless-ws.cloud.databricks.com

@@ -1,0 +1,6 @@
+# Local tooling only (linting, reading config). The Databricks jobs install
+# their own libraries (see resources/jobs.yml). You do NOT need these to run
+# the benchmark — only for local development / inspection.
+pyyaml>=6.0
+databricks-sql-connector>=3.0.0
+databricks-sdk>=0.30.0

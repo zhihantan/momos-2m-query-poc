@@ -1,0 +1,46 @@
+# Two jobs:
+#   momos_generate_data — synthesize the star schema (serverless). Run once per scale.
+#   momos_benchmark     — drive the load (single-node classic) then analyze (serverless).
+#
+# warehouse_id is injected from the warehouse resource, so no name lookup is needed.
+resources:
+  jobs:
+
+    momos_generate_data:
+      name: momos_generate_data
+      tasks:
+        - task_key: generate
+          notebook_task:
+            notebook_path: ../notebooks/01_generate_data.py
+            base_parameters:
+              bundle_root: ${workspace.file_path}
+              scale: sf1                       # override to 'full' for the showcase run
+          # No cluster block -> notebook runs on serverless compute.
+
+    momos_benchmark:
+      name: momos_benchmark
+      # Allow several generator instances to run at once and share a run_tag:
+      # one serverless node caps ~130 QPS, so N instances -> ~130*N QPS. The
+      # combined load is aggregated in system.query.history by the shared tag.
+      max_concurrent_runs: 12
+      tasks:
+        - task_key: run_benchmark
+          notebook_task:
+            notebook_path: ../notebooks/02_run_benchmark.py
+            base_parameters:
+              bundle_root: ${workspace.file_path}
+              warehouse_id: ${resources.sql_warehouses.momos_wh.id}
+              use_smoke: "true"                # smoke defaults; override widgets for the full run
+          # No cluster block -> serverless. The load generator is a driver-side
+          # thread pool (pure Python + network), so serverless is a perfect fit;
+          # the notebook %pip-installs databricks-sql-connector.
+
+        - task_key: analyze
+          depends_on:
+            - task_key: run_benchmark
+          notebook_task:
+            notebook_path: ../notebooks/03_analyze_results.py
+            base_parameters:
+              bundle_root: ${workspace.file_path}
+              warehouse_id: ${resources.sql_warehouses.momos_wh.id}
+          # No cluster block -> serverless.
