@@ -13,7 +13,34 @@ customers · 20K menu items**. Warehouse: Serverless SQL, autoscaling.
 
 ---
 
-## Headline — 2,000,000 queries, serving mode
+## Maximum run — 2,319,462 queries (distributed generator, 60-min maximize)
+
+Run tag `momos_dist_60min`. **7 parallel `momos_benchmark_distributed` instances**
+(each a `mapInPandas` generator on its own node) sharing the tag, serving mode,
+against a Medium warehouse scaled to 30→40 clusters.
+
+| metric (system.query.history) | value |
+|---|---|
+| **Total queries (proven)** | **2,319,462** |
+| Within a strict 60-min window | 1,941,159 |
+| Errors / not-finished | **1** (of 2.32M — 99.99996% success) |
+| Result-cache hit rate | **99.96%** |
+| Sustained aggregate QPS | **~539 QPS** |
+| Latency p50 | ~526 ms |
+| Data scanned | ~0 GB (near-100% cache — no storage reads) |
+| Warehouse | Serverless SQL, Medium, autoscaled to 40 clusters |
+
+**Key finding — a serving-throughput plateau.** Sustained QPS held at **~540**
+even after scaling clusters 30→40 and generator instances 4→7. So on this
+warehouse the ceiling wasn't clusters or client count — it's the per-query
+**planning floor** (~270 ms, applies even to cache hits) times the per-warehouse
+concurrency. To push past ~540 QPS you raise the warehouse **size** (Large/XL cut
+compile+exec per query), not the cluster count. The distributed generator hit its
+own single-node cap too (serverless kept each `mapInPandas` job on one node), which
+is why 7 parallel instances were used. Net: 2.3M queries proven, 60-min-window
+1.94M; a size-up would clear 2M inside a strict 60 min.
+
+## Headline — 2,000,000 queries, serving mode (single-warehouse, N driver-pool generators)
 
 The realistic **application serving-layer** pattern: result cache on, hot-set of
 popular customers/menu items, load driven by **6 generator instances** sharing one

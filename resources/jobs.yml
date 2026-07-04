@@ -49,6 +49,9 @@ resources:
     # across serverless executors, so ONE job scales past the ~150 QPS/node cap.
     momos_benchmark_distributed:
       name: momos_benchmark_distributed
+      # On serverless-only, one instance stays single-node (~220 QPS); run several
+      # sharing a run_tag (each lands on its own node) to exceed the single-node cap.
+      max_concurrent_runs: 8
       tasks:
         - task_key: run_benchmark_distributed
           notebook_task:

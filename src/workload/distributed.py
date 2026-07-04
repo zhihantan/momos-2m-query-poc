@@ -225,6 +225,25 @@ def run_benchmark_distributed(spark, cfg, *, host, http_path, token, overrides=N
       FROM {fq(cfg, 'query_log_dist')} WHERE run_tag = '{run_tag}'
     """).collect()[0].asDict()
 
+    # Register the run so the dashboard features it (query.history stays authoritative).
+    # Totals are estimated from the sampled log: logged / sample_rate.
+    est_total = int(round((agg["logged"] or 0) / max(sample_rate, 1e-9)))
+    est_qps = round(est_total / agg["span_s"], 1) if agg["span_s"] else 0.0
+    try:
+        spark.sql(f"""
+          INSERT INTO {fq(cfg, 'run_registry')}
+          SELECT '{run_tag}', '{mode}', '{scale_name}', '{profile}',
+                 '{cfg['warehouse']['name']}', CAST({concurrency} AS INT),
+                 CAST({target_qps} AS DOUBLE), CAST({duration_seconds} AS INT),
+                 {str(pace).lower()},
+                 min(timestamp_millis(submit_epoch_ms)), max(timestamp_millis(submit_epoch_ms)),
+                 CAST({est_total} AS BIGINT), CAST({est_total - (agg['errors'] or 0)} AS BIGINT),
+                 CAST({agg['errors'] or 0} AS BIGINT), CAST({est_qps} AS DOUBLE)
+          FROM {fq(cfg, 'query_log_dist')} WHERE run_tag = '{run_tag}'
+        """)
+    except Exception as e:  # noqa: BLE001
+        print("[dist] run_registry write skipped:", repr(e)[:200])
+
     summary = {"run_tag": run_tag, "mode": mode, "scale": scale_name,
                "partitions": num_partitions, "threads_per_partition": threads_per_partition,
                "concurrency": concurrency, "wall_seconds": round(wall, 1),
