@@ -44,6 +44,22 @@ distributed generators, 99.5% cache, ~540 QPS sustained) — full detail in
 The generator's client count matched `system.query.history` **exactly**
 (2,007,069 = 2,007,069) — the proof is airtight.
 
+### Best warehouse configuration
+
+For this cache-backed serving workload, the cost-optimal Serverless SQL Warehouse:
+
+| setting | value | why |
+|---|---|---|
+| **Size** | **Small** | serving throughput is size-independent (~520 QPS/warehouse) — a bigger size costs 2–3× for the same rate |
+| **Type** | Serverless + Photon | instant start, autoscaling, result cache |
+| **Clusters (serving)** | min 1 → max ~20 | ~10 concurrent queries per cluster; ~20 covers the ~520 QPS ceiling |
+| **Clusters (timed run)** | warm floor min 4–6 | avoids the cold-start ramp eating into the window |
+| **Auto-stop** | 10 min | ~$0 when idle |
+
+One Small warehouse sustains **~520 QPS ≈ 1.9M queries/hour at ~$85/million**. To
+clear **2M within 60 minutes**, run **two Small warehouses in parallel** (~1,100 QPS)
+— still cheaper per query than one Medium/Large. Full cost breakdown below.
+
 ---
 
 ## Why this matters
