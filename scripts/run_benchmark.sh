@@ -10,7 +10,7 @@
 set -euo pipefail
 KIND="${1:-smoke}"
 MODE="${2:-compute}"
-PROFILE="${3:-fe-vm-zh-serverless}"
+PROFILE="${3:-your-profile}"
 cd "$(dirname "$0")/.."
 
 JOB_ID="$(databricks jobs list --name momos_benchmark -p "$PROFILE" -o json \

@@ -4,7 +4,7 @@ All figures come from the platform's own system tables (`system.query.history`,
 `system.billing.usage`) filtered to a run's tag — not from the client. Regenerate
 with notebook `03_analyze_results`.
 
-Live environment: FE workspace `fe-vm-zh-serverless`, catalog
+Live environment: FE workspace `your-profile`, catalog
 `zh_serverless_ws.momos_cx`, showcase data = **25M orders · 12M reviews · 2M
 customers · 20K menu items**. Warehouse: Serverless SQL, autoscaling.
 
@@ -91,7 +91,7 @@ popular customers/menu items, load driven by **6 generator instances** sharing o
 `run_tag` (one generator node caps ~150 QPS — the client is the bottleneck, so you
 scale it out). Warehouse: **Medium**, autoscale to 24 clusters.
 
-Run tag `momos_2M_serving` (2026-07-04, workspace `fe-vm-zh-serverless`). 6
+Run tag `momos_2M_serving` (2026-07-04, workspace `your-profile`). 6
 generators for the bulk, then a short 3-generator top-up — all sharing the tag, so
 `system.query.history` aggregates them into one proven count.
 

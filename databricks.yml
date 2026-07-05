@@ -1,5 +1,5 @@
 # Databricks Asset Bundle — one command deploys the whole showcase:
-#   databricks bundle deploy -t dev -p fe-vm-zh-serverless
+#   databricks bundle deploy -t dev -p your-profile
 #
 # Resources: the serverless SQL warehouse under test, the data-gen job
 # (serverless), the benchmark job (single-node classic + analyze), and the
@@ -17,4 +17,4 @@ targets:
   dev:
     default: true
     workspace:
-      host: https://fe-vm-zh-serverless-ws.cloud.databricks.com
+      host: https://YOUR-WORKSPACE.cloud.databricks.com

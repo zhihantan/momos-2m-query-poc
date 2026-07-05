@@ -2,7 +2,7 @@
 # Deploy the bundle and generate the default (sf1) datasets.
 #   ./scripts/setup.sh [PROFILE] [TARGET]
 set -euo pipefail
-PROFILE="${1:-fe-vm-zh-serverless}"
+PROFILE="${1:-your-profile}"
 TARGET="${2:-dev}"
 cd "$(dirname "$0")/.."
 

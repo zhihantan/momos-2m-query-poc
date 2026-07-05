@@ -5,7 +5,7 @@
 # (and the jobs + dashboard) outright. Generated data in the schema is NOT dropped
 # by default — uncomment the DROP SCHEMA line if you want it gone.
 set -euo pipefail
-PROFILE="${1:-fe-vm-zh-serverless}"
+PROFILE="${1:-your-profile}"
 TARGET="${2:-dev}"
 CATALOG="${3:-zh_serverless_ws}"
 SCHEMA="${4:-momos_cx}"

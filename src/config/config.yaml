@@ -10,8 +10,8 @@
 # Databricks connection & data location
 # ----------------------------------------------------------------------
 databricks:
-  profile: fe-vm-zh-serverless
-  host: https://fe-vm-zh-serverless-ws.cloud.databricks.com
+  profile: your-profile
+  host: https://YOUR-WORKSPACE.cloud.databricks.com
   catalog: zh_serverless_ws        # reuse existing FE-VM managed catalog
   schema: momos_cx                 # customer-experience star schema lives here
 

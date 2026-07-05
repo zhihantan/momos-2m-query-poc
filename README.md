@@ -94,7 +94,7 @@ run-tag comment.
 ## Run it
 
 **Prerequisites:** Databricks CLI ≥ 0.240, a workspace with **serverless SQL**
-enabled, and a CLI profile (default here: `fe-vm-zh-serverless`). Adjust
+enabled, and a CLI profile (default here: `your-profile`). Adjust
 `databricks.yml` (host) and `src/config/config.yaml` (catalog/schema/warehouse) for
 your workspace.
 
@@ -107,7 +107,7 @@ your workspace.
 #   -> job runs the load generator, then 03_analyze_results prints the metrics
 
 # 3) The headline: generate full-scale data, warm the warehouse, run 2M/60min
-databricks bundle run momos_generate_data -t dev -p fe-vm-zh-serverless --params scale=full
+databricks bundle run momos_generate_data -t dev -p your-profile --params scale=full
 #   set a warm floor (min clusters) — see docs/tuning.md — then:
 ./scripts/run_benchmark.sh full          # compute mode; add 'serving' for cache mode
 ```
@@ -122,7 +122,7 @@ executors). It records the executor `node` per query, so `count(distinct node)`
 tells you if you actually got multi-node.
 
 ```bash
-databricks bundle run momos_benchmark_distributed -t dev -p fe-vm-zh-serverless
+databricks bundle run momos_benchmark_distributed -t dev -p your-profile
 ```
 
 > **Compute matters** (measured — see [docs/tuning.md §7](docs/tuning.md)): on a
