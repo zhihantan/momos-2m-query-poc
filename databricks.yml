@@ -2,7 +2,7 @@
 #   databricks bundle deploy -t dev -p your-profile
 #
 # Resources: the serverless SQL warehouse under test, the data-gen job
-# (serverless), the benchmark job (single-node classic + analyze), and the
+# (serverless), the benchmark + analyze jobs (serverless), and the
 # AI/BI dashboard. Names are literal (no dev-mode prefixing) so the Python in
 # src/ can find the warehouse by the name in config.yaml — deploy one copy per
 # workspace.

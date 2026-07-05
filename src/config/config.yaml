@@ -67,7 +67,7 @@ benchmark:
   client_log_sample_rate: 1.0      # fraction of OK queries logged client-side (errors always logged);
                                    # lower it (e.g. 0.1) on the full 2M run to bound driver memory
 
-  # Client-side parallelism (runs on a CLASSIC cluster for predictable concurrency)
+  # Client-side parallelism (driver thread pool on serverless compute)
   #   in-flight concurrency ~= num_partitions * threads_per_partition
   num_partitions: 32               # ~= load-gen cluster total cores (1 Spark task per core)
   threads_per_partition: 8         # concurrency multiplier per task

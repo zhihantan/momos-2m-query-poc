@@ -63,14 +63,17 @@ truthful stories:
   dashboard hitting popular customers/menu items). The result + disk caches are
   exploited: ultra-low latency, near-zero marginal cost.
 
-## Why the load generator is a thread pool, not Spark fan-out
+## Why the client is scaled out
 
 The bottleneck in a query benchmark is almost always the *client*, not the
 warehouse. Every query here is a network round-trip, so the threads spend nearly
-all their time blocked on the warehouse (releasing the GIL). One serverless node
-running a few hundred threads sustains 556+ QPS comfortably, and it keeps the code
-simple (no wheel build, all `src/` imports just work). To go to thousands of QPS,
-partition the thread set across Spark executors — see [tuning.md](tuning.md).
+all their time blocked on the warehouse (releasing the GIL). But a single
+generator node still tops out at **~130–150 QPS** (Python/connection overhead), so
+to reach 556+ QPS we run **several generator instances that share one run_tag** —
+`system.query.history` aggregates them into one proven count. An
+executor-distributed variant (`src/workload/distributed.py`, via `mapInPandas`)
+does the same fan-out inside one job on a multi-node cluster; see
+[tuning.md](tuning.md).
 
 The load generator runs on **separate compute** from the warehouse, so we measure
 the warehouse, not the generator.

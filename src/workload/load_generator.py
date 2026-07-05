@@ -1,16 +1,15 @@
 """Distributed-by-threads load generator.
 
-Runs on the DRIVER of a single-node classic job cluster using a large thread
-pool. Each thread owns one SQL-connector connection to the serverless warehouse
-and issues a paced stream of parameterized queries until the deadline. Because
-every query is a network round-trip, the threads spend almost all their time
-blocked on the warehouse (releasing the GIL), so one ~16-core node comfortably
-drives 556+ QPS.
+Runs as a driver-side thread pool on serverless compute. Each thread owns one
+SQL-connector connection to the serverless warehouse and issues a paced stream of
+parameterized queries until the deadline. Because every query is a network
+round-trip, the threads spend almost all their time blocked on the warehouse
+(releasing the GIL).
 
-Why a thread pool and not Spark executors? For an I/O-bound load test a single
-node is more than enough, and it keeps ``src`` importable without a wheel build.
-The design scales horizontally (partition the thread set across executors) if you
-ever need thousands of QPS — see docs/tuning.md.
+Measured: a single generator node tops out at ~130-150 QPS (Python/connection
+overhead). To reach higher aggregate QPS, run several instances sharing one
+run_tag (system.query.history aggregates them), or use the executor-distributed
+variant (src/workload/distributed.py) — see docs/tuning.md.
 
 Concurrency = num_partitions * threads_per_partition (both kept as config knobs
 for readability; physically realized as one thread pool of that size).
@@ -96,7 +95,7 @@ def _worker_loop(worker_id, cfg, scale, mode, host, http_path, token,
     = false`` in compute mode forces real Photon work on every query; serving mode
     leaves the result cache on and relies on the hot-set params for cache hits.
     (Databricks normalizes out SQL comments when keying the result cache, so a
-    per-query comment nonce does NOT bust it — the session SET is what does.)"""
+    unique comment per query does NOT bust it — the session SET is what does.)"""
     from databricks import sql  # installed via %pip in the notebook
 
     rows, attempts, ok, errors = [], 0, 0, 0

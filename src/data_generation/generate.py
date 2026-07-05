@@ -4,7 +4,7 @@ star schema.
 Everything is expressed with the Spark DataFrame API + pyspark.sql.functions so
 it runs on **serverless** compute (Spark Connect compatible — no RDD, no UDFs).
 Row generation is fully distributed via ``spark.range`` + column expressions, so
-100M+ rows synthesize in minutes.
+tens of millions of rows synthesize in minutes.
 
 Tables (in ``<catalog>.<schema>``):
     products           dim  — menu items (name, category, brand, price)

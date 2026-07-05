@@ -1,6 +1,6 @@
 # Two jobs:
 #   momos_generate_data — synthesize the star schema (serverless). Run once per scale.
-#   momos_benchmark     — drive the load (single-node classic) then analyze (serverless).
+#   momos_benchmark     — drive the load then analyze (both serverless).
 #
 # warehouse_id is injected from the warehouse resource, so no name lookup is needed.
 resources:

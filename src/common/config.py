@@ -57,18 +57,13 @@ def make_run_tag(prefix: str, mode: str, scale: str) -> str:
     return f"{prefix}_{ts}_{mode}_{scale}"
 
 
-def run_marker(run_tag: str, template_id: str, nonce=None) -> str:
+def run_marker(run_tag: str, template_id: str) -> str:
     """SQL comment prepended to every benchmark query. Kept on one line so it
-    survives intact in system.query.history.statement_text.
-
-    ``nonce`` (compute mode) makes each statement's text unique, which busts the
-    result cache without needing a session-level SET — so it works with the
-    stateless Statement Execution API. Omit it (serving mode) for identical text
-    that the result cache can serve. The run-tag prefix and ``tpl=`` token are
-    unaffected, so history filtering and per-template extraction still work."""
-    if nonce is None:
-        return f"/* {run_tag} tpl={template_id} */"
-    return f"/* {run_tag} tpl={template_id} n={nonce} */"
+    survives intact in system.query.history.statement_text — which lets the
+    analysis filter the audit log to exactly one run and extract the template id.
+    (Cache control is done with a session-level SET, not comment tricks:
+    Databricks normalizes comments out of the result-cache key.)"""
+    return f"/* {run_tag} tpl={template_id} */"
 
 
 def history_like_pattern(run_tag: str) -> str:

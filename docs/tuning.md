@@ -17,6 +17,12 @@ For **many small queries**, adding *clusters* beats a bigger *size*.
 `~10 / 0.15 ≈ 66 QPS`. For 556 QPS you need `~9` clusters; configure `max=20` for
 headroom and variance.
 
+> **Measured caveat:** the above is the textbook model. In *serving mode* (cache
+> hits) we found throughput is **compile-bound at ~520–550 QPS per warehouse** and
+> does **not** rise with more clusters or a bigger size (see §8 and
+> [results.md](results.md#cost--performance)). The scale-out model applies to
+> *compute mode* (real scans), where execution — not planning — is the bottleneck.
+
 ## 2. Use a warm floor for the timed run
 
 A cold warehouse starts at `min_num_clusters` and autoscales up as load arrives —
@@ -114,7 +120,7 @@ multi-node — no waiting for `query.history` ingestion.
   `concat_tables() got an unexpected keyword argument 'promote_options'`. The
   notebooks `%pip install databricks-sql-connector "pyarrow>=14.0.0"`.
 - **Comments do NOT bust the result cache.** Databricks normalizes SQL comments
-  out of the result-cache key, so a per-query comment nonce still hits cache. The
+  out of the result-cache key, so adding a unique comment per query still hits cache. The
   reliable cache control is the session setting `SET use_cached_result = false`
   (compute mode) — which works because the connector holds a persistent session
   (the stateless Statement Execution API cannot do this).

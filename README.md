@@ -78,7 +78,7 @@ Referential integrity is built in; tables are **liquid-clustered** on
 | profile | products | profiles | orders | reviews |
 |---|---|---|---|---|
 | `sf1` (default) | 1K | 100K | 1M | 500K |
-| `full` (showcase) | 50K | 2M | 100M | 50M |
+| `full` (showcase) | 20K | 2M | 25M | 12M |
 
 ## The workload
 
@@ -136,7 +136,7 @@ databricks bundle run momos_benchmark_distributed -t dev -p your-profile
 
 The bundle deploys an **AI/BI dashboard** ("Momos · 2M Queries") that auto-targets
 the latest run: cumulative-count race to 2M, QPS timeline, latency percentiles,
-the autoscaling curve, cache-hit rate, and a cost tile.
+the autoscaling curve, and cache-hit rate.
 
 ---
 
