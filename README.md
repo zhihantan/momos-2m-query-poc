@@ -30,8 +30,8 @@ which is the most useful thing here:
 
 ## Results (from `system.query.history`, not self-reported)
 
-**Max run: 2,319,462 queries** served from one Serverless SQL warehouse (7 parallel
-distributed generators, 99.96% cache, ~539 QPS, 1 not-finished) — details and the
+**Max run: 2,756,577 queries** served from one Serverless SQL warehouse (7 parallel
+distributed generators, 99.5% cache, ~540 QPS sustained) — details and the
 serving-throughput-plateau finding in **[docs/results.md](docs/results.md)**. The
 two-mode picture below is from the earlier single-warehouse run:
 

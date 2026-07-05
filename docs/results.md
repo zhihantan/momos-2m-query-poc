@@ -13,7 +13,7 @@ customers · 20K menu items**. Warehouse: Serverless SQL, autoscaling.
 
 ---
 
-## Maximum run — 2,319,462 queries (distributed generator, 60-min maximize)
+## Maximum run — 2,756,577 queries (distributed generator, 60-min maximize)
 
 Run tag `momos_dist_60min`. **7 parallel `momos_benchmark_distributed` instances**
 (each a `mapInPandas` generator on its own node) sharing the tag, serving mode,
@@ -21,13 +21,14 @@ against a Medium warehouse scaled to 30→40 clusters.
 
 | metric (system.query.history) | value |
 |---|---|
-| **Total queries (proven)** | **2,319,462** |
+| **Total queries executed (proven)** | **2,756,577** |
 | Within a strict 60-min window | 1,941,159 |
-| Errors / not-finished | **1** (of 2.32M — 99.99996% success) |
-| Result-cache hit rate | **99.96%** |
-| Sustained aggregate QPS | **~539 QPS** |
-| Latency p50 | ~526 ms |
+| Errors / not-finished | 39 (of 2.76M — 99.9986% success; ~all from job cancellation) |
+| Result-cache hit rate | **99.5%** |
+| Sustained aggregate QPS | **~540 QPS** (~521 over the full span) |
+| Latency p50 | ~461 ms |
 | Data scanned | ~0 GB (near-100% cache — no storage reads) |
+| Run span | 88.2 min (the distributed wave-jobs + cancellation ran past 60 min) |
 | Warehouse | Serverless SQL, Medium, autoscaled to 40 clusters |
 
 **Key finding — a serving-throughput plateau.** Sustained QPS held at **~540**
@@ -37,8 +38,9 @@ warehouse the ceiling wasn't clusters or client count — it's the per-query
 concurrency. To push past ~540 QPS you raise the warehouse **size** (Large/XL cut
 compile+exec per query), not the cluster count. The distributed generator hit its
 own single-node cap too (serverless kept each `mapInPandas` job on one node), which
-is why 7 parallel instances were used. Net: 2.3M queries proven, 60-min-window
-1.94M; a size-up would clear 2M inside a strict 60 min.
+is why 7 parallel instances were used. Net: 2.76M queries proven (over an 88-min
+span as the wave-jobs ran long), 60-min-window 1.94M; a warehouse size-up would
+clear 2M inside a strict 60 min.
 
 ## Headline — 2,000,000 queries, serving mode (single-warehouse, N driver-pool generators)
 
