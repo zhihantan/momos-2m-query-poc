@@ -13,6 +13,48 @@ customers · 20K menu items**. Warehouse: Serverless SQL, autoscaling.
 
 ---
 
+## Cost / performance — cheapest config for ~2M queries/hour
+
+**Finding: serving-mode throughput caps at ~550 QPS *per warehouse*, and the cap is
+independent of warehouse size and cluster count.** Verified live:
+
+| warehouse | clusters | sustained QPS | avg compile | avg exec |
+|---|---|---|---|---|
+| Small | 40 | **~520** | ~420 ms | ~5 ms |
+| Medium | 40 | **~552** | ~610 ms | ~3 ms |
+| Large | 16 | ~490–545 | ~360 ms | ~4 ms |
+
+Cluster scaling on Medium: 20→40 clusters only moved 528→552 QPS. Pushing Small
+with **8 client instances (~1,200 QPS offered)** still gave only ~520 — so it is
+**not client-limited** either. Neither **size**, **cluster count**, nor **client
+count** raises the ceiling — the limit is the **per-query compile/planning
+overhead** (~270 ms cold, inflating to ~610 ms under load), which applies **even to
+cache hits**. Cache-hit **execution is essentially free** (~3–6 ms).
+
+**Implication — don't pay for a bigger warehouse.** Because execution is free and
+size doesn't raise the ceiling, cost scales with the per-cluster DBU rate for the
+same ~550 QPS. Small is the cost-optimal size:
+
+| size | DBU/hr per cluster | ≈ cost for 2M queries |
+|---|---|---|
+| **Small** | 12 | **~$230** |
+| Medium | 24 | ~$470 |
+| Large | 40 | ~$780 |
+
+**Cheapest way to do 2M in 60 min:**
+- A **single Small** warehouse sustains ~550 QPS → **~1.98M in 60 min** (just shy of
+  2M) at ~$230 — the cost floor for this workload.
+- To strictly **clear 2M inside 60 min**, run **2× Small warehouses in parallel**
+  (the ~550 cap is per-warehouse, so two give ~1,100 QPS → 2M in ~30 min, or
+  comfortably >2M in 60 min) — still far cheaper per query than one Medium/Large.
+- A **Large** warehouse is ~3× the cost of Small for the *same* ~550 QPS — the extra
+  compute idles because cache-hit execution is ~3 ms; you only pay for compile/queue.
+
+> If your real workload is **compute mode** (cache off, real scans) rather than
+> cache-served, execution is no longer free and *size does* help — size up then.
+
+---
+
 ## Maximum run — 2,756,577 queries (distributed generator, 60-min maximize)
 
 Run tag `momos_dist_60min`. **7 parallel `momos_benchmark_distributed` instances**
