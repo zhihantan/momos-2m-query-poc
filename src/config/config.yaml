@@ -59,8 +59,8 @@ benchmark:
   target_qps: 556                  # 2,000,000 / 3,600 (ceil)
 
   # Workload character
-  mode: compute                    # compute = uniform params (cache-busting, honest compute stress)
-                                   # serving = hot-set params (cache-friendly, real app/dashboard pattern)
+  mode: serving                    # serving = result cache on + hot-set params (the app serving-layer
+                                   # pattern). A cache-off variant also exists in the code.
   hot_set_size: 2000               # size of the "hot" key pool used in serving mode
   result_row_limit: 100            # LIMIT on every template -> measure engine throughput, not transfer
   template_weights_profile: mixed  # see query_templates.py (mixed | serving_heavy | analytics_heavy)

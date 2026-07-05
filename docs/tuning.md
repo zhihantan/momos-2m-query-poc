@@ -21,7 +21,8 @@ headroom and variance.
 > hits) we found throughput is **compile-bound at ~520–550 QPS per warehouse** and
 > does **not** rise with more clusters or a bigger size (see §8 and
 > [results.md](results.md#cost--performance)). The scale-out model applies to
-> *compute mode* (real scans), where execution — not planning — is the bottleneck.
+> workloads that scan fresh data (cache off), where execution — not planning — is
+> the bottleneck.
 
 ## 2. Use a warm floor for the timed run
 
@@ -48,15 +49,12 @@ and queries queue (watch `waiting_at_capacity_duration_ms`).
 - `pace: true` targets a fixed QPS (for the "2M in 60 min" headline).
 - `pace: false` is "unleashed" — finds the maximum sustainable QPS.
 
-## 4. Cache modes
+## 4. The result cache
 
-- **compute** mode issues `SET use_cached_result = false` and draws IDs uniformly,
-  so the engine does real work. This is what proves throughput.
-- **serving** mode leaves the result cache on and draws from a hot set; expect a
-  high `from_result_cache` rate, far lower latency, and far lower cost. This is the
-  realistic app/dashboard pattern.
-
-Report `cache_hit_rate` transparently either way.
+Serving draws IDs from a hot set (popular customers/menu items) with the result
+cache on, so repeated queries return from cache — a high `from_result_cache` rate,
+far lower latency, and far lower cost. This is the realistic app/dashboard pattern.
+Report `cache_hit_rate` transparently.
 
 ## 5. Data layout
 
@@ -122,7 +120,7 @@ multi-node — no waiting for `query.history` ingestion.
 - **Comments do NOT bust the result cache.** Databricks normalizes SQL comments
   out of the result-cache key, so adding a unique comment per query still hits cache. The
   reliable cache control is the session setting `SET use_cached_result = false`
-  (compute mode) — which works because the connector holds a persistent session
+  (for cache-off runs) — which works because the connector holds a persistent session
   (the stateless Statement Execution API cannot do this).
 - **Use the connector, not the SDK Statement Execution API, for high QPS.** The
   SDK's shared HTTP connection pool caps real concurrency (~10), so it tops out
@@ -131,14 +129,12 @@ multi-node — no waiting for `query.history` ingestion.
 - **Explicit DataFrame schemas when writing results.** Python `int` infers as
   Spark `long`; appending to an `INT` Delta column then fails to merge. The
   results tables use explicit schemas.
-- **There is a ~1s per-query floor in compute mode.** Measured on a Small
+- **A cache miss (cache off) has a ~1s per-query floor.** Measured on a Small
   serverless warehouse, even a point lookup runs ~1s end-to-end: ~270ms
   compilation (fixed planning overhead, *not* removed by parameterized queries),
-  ~300ms execution, ~400ms fetch/queue. So **cache-off ("compute") throughput is
-  capped by `max_clusters × 10 ÷ 1s`** — ~300 QPS at 30 clusters. To push
-  compute-mode QPS up, **size up** (Medium/Large cut compile+exec) and/or raise
-  max_clusters; to hit high QPS cheaply, use **serving mode** (the result cache
-  sidesteps the per-query compute floor).
+  ~300ms execution, ~400ms fetch/queue. So **cache-off throughput is capped by
+  `max_clusters × 10 ÷ 1s`** (~300 QPS at 30 clusters) and scales with size/clusters;
+  the result cache sidesteps this floor and is how you reach app-scale QPS cheaply.
 - **`system.query.history` ingests with a lag** (we saw ~8 min). The dashboard and
   the proof `COUNT(*)` are near-real-time-ish, not instant — wait a few minutes
   after a run for the authoritative numbers.

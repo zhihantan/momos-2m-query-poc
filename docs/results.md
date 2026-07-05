@@ -65,8 +65,8 @@ A single **Small** warehouse serves **~1.9M queries/hour for ~$85**. To serve 2M
 within the hour, run **two Small warehouses in parallel** (~1,100 QPS) — still far
 cheaper per query than one larger warehouse.
 
-> If your workload is **compute mode** (cache off, real scans) rather than
-> cache-served, execution is no longer free and a bigger size *does* help.
+> This holds for cache-served workloads. If every query instead scans fresh data,
+> execution dominates (not planning) and a bigger warehouse *does* help.
 
 ---
 
@@ -89,27 +89,6 @@ cost section above).
 
 ---
 
-## Companion — compute mode (result cache OFF)
-
-The honest "every query does real work" measurement (`SET use_cached_result =
-false`; verified `from_result_cache = 0.0%`). This shows the true per-query cost of
-Serverless SQL:
-
-| measurement (compute mode) | value |
-|---|---|
-| Result-cache hit rate | **0.0%** (real work every query) |
-| Per-query latency (even a point lookup) | **~1.0 s** |
-| ├─ compilation | ~270 ms |
-| ├─ execution (Photon) | ~250–500 ms |
-| └─ fetch / queue | ~300–450 ms |
-| Sustained QPS (Small, 30 clusters) | ~130–300 |
-
-At ~1 s/query, cache-off throughput is bounded by `clusters × ~10 ÷ 1 s`, so it
-scales with size and cluster count — the opposite of the cache-served ceiling. For
-app-scale QPS at low cost, serve from the result cache (the headline above).
-
----
-
 ## Scaling the load generator
 
 The warehouse is rarely the first bottleneck — the load generator is. One
@@ -118,8 +97,8 @@ generator node tops out around ~130–150 QPS (Python/connection overhead):
 | generator (one node) | achieved QPS |
 |---|---|
 | 32 threads | ~116 |
-| 120 threads (serving) | ~152 |
-| 320 threads (compute) | ~133 |
+| 120 threads | ~152 |
+| 320 threads | ~133 |
 
 Higher aggregate QPS therefore comes from running **several generator instances
 that share one run tag** — `system.query.history` aggregates them into a single

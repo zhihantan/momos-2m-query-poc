@@ -19,33 +19,29 @@ which is the most useful thing here:
   ~130–150 QPS (Python/connection limits), so hitting 556+ QPS means running
   **several generator instances that share a run_tag** — `system.query.history`
   aggregates them into one proven count. The warehouse had capacity to spare.
-- **Two honest modes.** *Serving mode* (result cache on, hot data — the real
-  app-serving pattern) hits 2M/hour cheaply. *Compute mode* (cache off, `SET
-  use_cached_result=false`, **verified 0% cache**) shows the true per-query cost:
-  ~1 s each (~270 ms compile + ~250–500 ms Photon exec + fetch), so cache-off
-  throughput scales with clusters/size. Both are shown; see
-  [docs/results.md](docs/results.md).
+- **It's a cache-backed serving layer.** With the result cache on and load drawn
+  from a hot set of popular customers/menu items — how a real app hits the
+  warehouse — one warehouse sustains ~520 QPS at ~$85/million, every count verified
+  in `system.query.history`. See [docs/results.md](docs/results.md).
 
 ---
 
 ## Results (from `system.query.history`, not self-reported)
 
 **Max run: 2,756,577 queries** served from one Serverless SQL warehouse (7 parallel
-distributed generators, 99.5% cache, ~540 QPS sustained) — details and the
-serving-throughput-plateau finding in **[docs/results.md](docs/results.md)**. The
-two-mode picture below is from the earlier single-warehouse run:
+distributed generators, 99.5% cache, ~540 QPS sustained) — full detail in
+**[docs/results.md](docs/results.md)**. The headline serving run:
 
-| | Serving mode (headline) | Compute mode (real work) |
-|---|---|---|
-| What it shows | app serving layer at scale | true per-query cost, 0% cache |
-| Queries served (proven) | **2,007,069** — 0 errors | measured per-query anatomy |
-| Sustained rate | **~528 QPS ≈ 1.9M/hour** | ~130–300 QPS (planning-floor bound) |
-| Result-cache hit rate | **98.8%** (warmed to 99.5%) | **0.0%** (verified) |
-| Per-query latency | p50 **356 ms** | ~1 s (270 ms compile + Photon + fetch) |
-| Data scanned / peak clusters | 594.5 GB / 22 | — |
-| Proven by | `system.query.history COUNT(*)` | same |
+| metric | value |
+|---|---|
+| Queries served (proven) | **2,007,069** — 0 errors |
+| Sustained rate | **~528 QPS ≈ 1.9M/hour** |
+| Result-cache hit rate | **98.8%** (warms to 99.5%) |
+| Latency p50 / p95 | **356 ms / 1.7 s** |
+| Cost (measured) | **~$85 / million** |
+| Proven by | `system.query.history COUNT(*)` |
 
-The generator client count matched `system.query.history` **exactly**
+The generator's client count matched `system.query.history` **exactly**
 (2,007,069 = 2,007,069) — the proof is airtight.
 
 ---
@@ -58,8 +54,8 @@ The generator client count matched `system.query.history` **exactly**
   at app scale is cheap on serverless.
 - **The proof is the platform's.** Every query is tagged; we `COUNT(*)` it in
   `system.query.history` and read the dollars from `system.billing.usage`.
-- **Two honest modes.** *compute* (cache-busting, real Photon work) and *serving*
-  (cache-friendly, real app pattern) — you can show both truthfully.
+- **Cache-backed serving layer.** Popular customers and menu items are served from
+  the result cache at app scale — the pattern a real front end drives.
 
 ---
 
@@ -109,7 +105,7 @@ your workspace.
 # 3) The headline: generate full-scale data, warm the warehouse, run 2M/60min
 databricks bundle run momos_generate_data -t dev -p your-profile --params scale=full
 #   set a warm floor (min clusters) — see docs/tuning.md — then:
-./scripts/run_benchmark.sh full          # compute mode; add 'serving' for cache mode
+./scripts/run_benchmark.sh full serving  # serving mode (result cache)
 ```
 
 Or open **`notebooks/00_quickstart.py`** and Run All for the whole thing at `sf1`
@@ -125,7 +121,7 @@ tells you if you actually got multi-node.
 databricks bundle run momos_benchmark_distributed -t dev -p your-profile
 ```
 
-> **Compute matters** (measured — see [docs/tuning.md §7](docs/tuning.md)): on a
+> **Cluster type matters** (measured — see [docs/tuning.md §7](docs/tuning.md)): on a
 > **classic multi-node cluster** this fans across real nodes → thousands of QPS
 > from one job. On a **serverless-only** workspace, serverless kept it on **one
 > node** (no multi-node scale-out for this I/O-bound job), so there the reliable

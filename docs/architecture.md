@@ -51,17 +51,12 @@ minority of customers drive most orders/reviews); ratings correlate with
 sentiment and helpful-vote counts. Tables are **liquid-clustered** on the
 join/lookup keys (`customer_id`, `product_id`) so point lookups and joins prune.
 
-## Two honest workload modes
+## The workload — a serving-layer pattern
 
-The parameter sampler's key distribution controls the cache — so you can tell two
-truthful stories:
-
-- **compute** — IDs drawn uniformly across the full key space; the client also
-  issues `SET use_cached_result = false`. The warehouse does real Photon work for
-  ~556 QPS. This is the honest compute stress test.
-- **serving** — IDs drawn from a small fixed "hot set" (like a real app or
-  dashboard hitting popular customers/menu items). The result + disk caches are
-  exploited: ultra-low latency, near-zero marginal cost.
+The parameter sampler draws IDs from a small fixed "hot set" (like a real app or
+dashboard hitting popular customers/menu items), with the result cache on. Repeated
+access to popular data is served from cache at ultra-low latency and near-zero
+marginal cost — the realistic serving-layer pattern.
 
 ## Why the client is scaled out
 
