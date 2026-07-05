@@ -33,17 +33,19 @@ cache hits**. Cache-hit **execution is essentially free** (~3–6 ms).
 
 **Implication — don't pay for a bigger warehouse.** Because execution is free and
 size doesn't raise the ceiling, cost scales with the per-cluster DBU rate for the
-same ~550 QPS. Small is the cost-optimal size:
+same ~550 QPS. Small is the cost-optimal size. Costs below are **measured from
+`system.billing.usage`** ($0.70/DBU list): the 2M serving run on **Medium** billed
+**~$170** (~$85/million); the other sizes scale by their per-cluster DBU rate:
 
-| size | DBU/hr per cluster | ≈ cost for 2M queries |
-|---|---|---|
-| **Small** | 12 | **~$230** |
-| Medium | 24 | ~$470 |
-| Large | 40 | ~$780 |
+| size | DBU/hr per cluster | ≈ $/1M queries | ≈ cost for 2M |
+|---|---|---|---|
+| **Small** | 12 | **~$42** | **~$85** |
+| Medium (measured) | 24 | ~$85 | ~$170 |
+| Large | 40 | ~$140 | ~$285 |
 
 **Cheapest way to do 2M in 60 min:**
 - A **single Small** warehouse sustains ~550 QPS → **~1.98M in 60 min** (just shy of
-  2M) at ~$230 — the cost floor for this workload.
+  2M) at ~$85 — the cost floor for this workload.
 - To strictly **clear 2M inside 60 min**, run **2× Small warehouses in parallel**
   (the ~550 cap is per-warehouse, so two give ~1,100 QPS → 2M in ~30 min, or
   comfortably >2M in 60 min) — still far cheaper per query than one Medium/Large.
@@ -72,6 +74,7 @@ against a Medium warehouse scaled to 30→40 clusters.
 | Data scanned | ~0 GB (near-100% cache — no storage reads) |
 | Run span | 88.2 min (the distributed wave-jobs + cancellation ran past 60 min) |
 | Warehouse | Serverless SQL, Medium, autoscaled to 40 clusters |
+| Cost (measured, `billing.usage`) | **~$828** (~$300/M — 40 clusters + long wave tail; *not* cost-optimal) |
 
 **Key finding — a serving-throughput plateau.** Sustained QPS held at **~540**
 even after scaling clusters 30→40 and generator instances 4→7. So on this
@@ -106,8 +109,8 @@ generators for the bulk, then a short 3-generator top-up — all sharing the tag
 | Latency p99 | 37 s — warm-up cache-miss aggregations on 25M rows skew the tail; p50/p95 are representative of steady state |
 | Data scanned | **594.5 GB** across the 2M queries |
 | Warehouse | Serverless SQL, **Medium**, autoscaled — **peak 22 clusters** |
-| Est. cost (this run) | ~$270 (Medium; ≈ half on Small — see note) |
-| **≈ Cost per million queries** | ~$135 (Medium) / ~$70 (Small) — planning-floor driven |
+| Cost (measured, `billing.usage`) | **~$170** (Medium; ~$85 on Small) |
+| **≈ Cost per million queries** | **~$85** (Medium) / ~$42 (Small) — measured |
 
 At the sustained ~528 QPS, a single continuous run reaches 2M in ~63 min; a modest
 size-up (or more clusters) brings it under 60. Here the 2M was accumulated as a

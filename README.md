@@ -175,12 +175,38 @@ docs/                     architecture · tuning · results
 scripts/                  setup · run_benchmark · teardown
 ```
 
-## Cost & cleanup
+## Cost (measured from `system.billing.usage`)
 
-Illustrative: a **Small** warehouse averaging ~8 clusters for an hour ≈ 96 DBU ≈
-**~$67** (verify your rate) → well under **$0.0001/query**. Guardrails: the
-warehouse `auto_stop_mins`, a small default scale, and a client-log sample rate for
-the big run.
+Actual DBU consumption billed to the warehouse — **not estimates** — at the list
+serverless-SQL rate of **$0.70/DBU** (verify your contract/region).
+
+**Headline 2M serving run** (Medium warehouse, cache-served): **≈ $170**, or
+**≈ $85 per million queries**.
+
+Serving-mode throughput is *size-independent* (all sizes cap ~520 QPS — see
+[docs/results.md](docs/results.md#cost--performance)), so cost scales with the
+per-cluster DBU rate. That makes **Small the cost-optimal choice** — same throughput,
+lowest price:
+
+| warehouse size | ≈ $ / 1M queries | ≈ $ / 2M run |
+|---|---|---|
+| **Small** (recommended) | **~$42** | **~$85** |
+| Medium (measured) | ~$85 | ~$170 |
+| Large | ~$140 | ~$285 |
+
+Chasing raw throughput costs more: the **2.76M "maximize" run** (Medium at **40**
+clusters) billed **≈ $828** (~$300/M) — 3–4× the cost-optimal rate, because the extra
+clusters and the long-running distributed wave-jobs mostly idled. For a cache-served
+serving layer, a **Small** warehouse at the ~520 QPS ceiling moves queries cheapest.
+
+> The full engineering study (every probe + run on 2026-07-04) consumed ~1,570 DBU
+> ≈ **$1,100** — but a single cost-optimal 2M run is the **~$85** above; the rest was
+> the experimentation to *find* that config.
+
+## Cleanup
+
+Guardrails: warehouse `auto_stop_mins`, a small default scale, and a client-log
+sample rate for large runs.
 
 ```bash
 ./scripts/teardown.sh     # deletes warehouse + jobs + dashboard (stops billing)
@@ -188,7 +214,8 @@ the big run.
 
 ## Caveats
 
-- Pricing/DBU figures are **illustrative** — confirm for your region/contract.
+- Costs are **measured** from `system.billing.usage` at the **$0.70/DBU** list rate —
+  confirm your contract/region rate.
 - The `~10 concurrent queries per cluster` heuristic and serverless behavior can
   change; verify against current Databricks docs.
 - Very high `max_num_clusters` may require an account limit increase.
