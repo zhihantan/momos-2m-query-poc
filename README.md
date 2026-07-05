@@ -194,14 +194,10 @@ lowest price:
 | Medium (measured) | ~$85 | ~$170 |
 | Large | ~$140 | ~$285 |
 
-Chasing raw throughput costs more: the **2.76M "maximize" run** (Medium at **40**
-clusters) billed **≈ $828** (~$300/M) — 3–4× the cost-optimal rate, because the extra
-clusters and the long-running distributed wave-jobs mostly idled. For a cache-served
-serving layer, a **Small** warehouse at the ~520 QPS ceiling moves queries cheapest.
-
-> The full engineering study (every probe + run on 2026-07-04) consumed ~1,570 DBU
-> ≈ **$1,100** — but a single cost-optimal 2M run is the **~$85** above; the rest was
-> the experimentation to *find* that config.
+Pushing for peak throughput costs more: serving 2.76M queries on a Medium warehouse
+at **40** clusters billed **≈ $828** (~$300/M) — over-provisioned for a workload
+where cache-hit execution is nearly free. For a cache-served serving layer, a
+**Small** warehouse at the ~520 QPS ceiling moves queries cheapest.
 
 ## Cleanup
 
