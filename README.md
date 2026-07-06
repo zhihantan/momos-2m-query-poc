@@ -6,8 +6,8 @@ audit log** (`system.query.history`, not the load script) — over realistic
 multi-location F&B customer-experience data, with **zero cluster management**.
 
 ```
-Measured: ~525 QPS sustained (peak 550) ≈ ~1.9M queries/hour.
-2,000,000 queries land in ~63 minutes — the sustained rate is the story, not one big query.
+Measured: ≈525 QPS sustained (peak 550) ≈ 1.9M queries/hour.
+2,000,000 queries land in ≈63 minutes — the sustained rate is the story, not one big query.
 ```
 
 This is a **concurrency + throughput** story: not "one big query is fast," but "a
@@ -15,18 +15,18 @@ serverless warehouse absorbs an application-scale query firehose, autoscaling
 itself." Running it live taught us the real performance model of Serverless SQL —
 the most useful thing here:
 
-- **Throughput is compile-bound at a shared ~550 QPS ceiling** on this workspace,
+- **Throughput is compile-bound at a shared ≈550 QPS ceiling** on this workspace,
   and that ceiling does **not** rise with more warehouses, a bigger size, or the
   cache (all measured — see [docs/results.md](docs/results.md)). This is very
   likely a limit of *this shared demo workspace's control plane*, not of Serverless
   SQL in general — **re-verify on your own workspace** (method in the results doc).
 - **The cache pays off in cost and latency, not throughput.** Cache-on and
-  cache-off hit the *same* ~550 QPS ceiling, but cache-on serves ~1.9M/hour at
-  **~$85/million and 356 ms p50**, while cache-off costs **~6× more** and runs ~3×
+  cache-off hit the *same* ≈550 QPS ceiling, but cache-on serves ≈1.9M/hour at
+  **≈$85/million and 356 ms p50**, while cache-off costs **≈6× more** and runs ≈3×
   slower (real execution on every query). This is the cache-backed serving pattern
   a real app drives.
 - **The client is usually the first bottleneck.** One generator node caps
-  ~130–150 QPS, so reaching ~550 QPS means **~4–5 generator instances sharing a
+  ≈130–150 QPS, so reaching ≈550 QPS means **≈4–5 generator instances sharing a
   run_tag** — `system.query.history` aggregates them into one proven count.
 
 ---
@@ -34,16 +34,16 @@ the most useful thing here:
 ## Results (from `system.query.history`, not self-reported)
 
 **Largest run: 2,756,577 queries** served from one Serverless SQL warehouse
-(99.5% cache), holding the same ~525 QPS ceiling over a longer window — full detail
+(99.5% cache), holding the same ≈525 QPS ceiling over a longer window — full detail
 in **[docs/results.md](docs/results.md)**. The headline serving run:
 
 | metric | value |
 |---|---|
 | Queries served (proven) | **2,007,069** — 0 errors |
-| Sustained rate | **~525 QPS ≈ ~1.9M/hour** (peak 30 s: 550) |
+| Sustained rate | **≈525 QPS ≈ 1.9M/hour** (peak 30 s: 550) |
 | Result-cache hit rate | **98.8%** (warms to 99.5%) |
 | Latency p50 / p95 | **356 ms / 1.7 s** |
-| Cost (measured) | **~$85 / million** |
+| Cost (measured) | **≈$85 / million** |
 | Proven by | `system.query.history COUNT(*)` |
 
 The generator's client count matched `system.query.history` **exactly**
@@ -55,15 +55,15 @@ For this cache-backed serving workload, the cost-optimal Serverless SQL Warehous
 
 | setting | value | why |
 |---|---|---|
-| **Size** | **Small** | throughput is compile-bound and **size-independent** (same ~550 QPS ceiling on Small/Medium/Large) — a bigger size costs 2–3× for the same rate |
+| **Size** | **Small** | throughput is compile-bound and **size-independent** (same ≈550 QPS ceiling on Small/Medium/Large) — a bigger size costs 2–3× for the same rate |
 | **Type** | Serverless + Photon | instant start, autoscaling, result cache |
-| **Clusters (serving)** | min 1 → max ~20 | ~10 concurrent queries per cluster; ~20 comfortably covers the ~550 QPS ceiling on cache hits |
+| **Clusters (serving)** | min 1 → max ≈20 | ≈10 concurrent queries per cluster; ≈20 comfortably covers the ≈550 QPS ceiling on cache hits |
 | **Clusters (timed run)** | warm floor min 4–6 | avoids the cold-start ramp eating into the window |
-| **Auto-stop** | 10 min | ~$0 when idle |
+| **Auto-stop** | 10 min | ≈$0 when idle |
 
-One Small warehouse reaches the ~550 QPS ceiling on its own — **~1.9M queries/hour
-at ~$85/million, 2M in ~63 min.** Adding warehouses doesn't raise the rate (measured
-1/2/3 warehouses, cache-on and cache-off, all ~550 QPS — compilation is a *shared*
+One Small warehouse reaches the ≈550 QPS ceiling on its own — **≈1.9M queries/hour
+at ≈$85/million, 2M in ≈63 min.** Adding warehouses doesn't raise the rate (measured
+1/2/3 warehouses, cache-on and cache-off, all ≈550 QPS — compilation is a *shared*
 control-plane resource; see [docs/results.md](docs/results.md#the-throughput-ceiling-is-shared--more-or-bigger-warehouses-dont-raise-it)).
 
 ---
@@ -148,7 +148,7 @@ databricks bundle run momos_benchmark_distributed -t dev -p your-profile
 > from one job. On a **serverless-only** workspace, serverless kept it on **one
 > node** (no multi-node scale-out for this I/O-bound job), so there the reliable
 > way to multi-node is the **N-parallel-jobs** pattern (several `momos_benchmark`
-> runs sharing a `run_tag`) — which is how the live 2M run reached ~525 QPS.
+> runs sharing a `run_tag`) — which is how the live 2M run reached ≈525 QPS.
 
 ### The dashboard
 
@@ -202,19 +202,19 @@ serverless-SQL rate of **$0.70/DBU** (verify your contract/region).
 **Headline 2M serving run** (Medium warehouse, cache-served): **≈ $170**, or
 **≈ $85 per million queries**.
 
-Serving-mode throughput is *size-independent* (all sizes cap at the shared ~550 QPS
+Serving-mode throughput is *size-independent* (all sizes cap at the shared ≈550 QPS
 ceiling — see [docs/results.md](docs/results.md)), so cost scales with the
 per-cluster DBU rate. That makes **Small the cost-optimal choice** — same throughput,
 lowest price:
 
 | warehouse size | ≈ $ / 1M queries | ≈ $ / 2M run |
 |---|---|---|
-| **Small** (recommended) | **~$42** | **~$85** |
-| Medium (measured) | ~$85 | ~$170 |
-| Large | ~$140 | ~$285 |
+| **Small** (recommended) | **≈$42** | **≈$85** |
+| Medium (measured) | ≈$85 | ≈$170 |
+| Large | ≈$140 | ≈$285 |
 
-**Turning the cache off costs ~6× more for the same throughput** (~$500 vs ~$85 per
-2M): reaching the same ~550 QPS ceiling cache-off took two Small warehouses (~80
+**Turning the cache off costs ≈6× more for the same throughput** (≈$500 vs ≈$85 per
+2M): reaching the same ≈550 QPS ceiling cache-off took two Small warehouses (≈80
 mostly compile-starved clusters) plus real execution on every query. For a
 cache-served serving layer, a **Small** warehouse moves queries cheapest.
 

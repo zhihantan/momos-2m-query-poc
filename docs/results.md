@@ -22,13 +22,13 @@ share one run tag. One Serverless SQL Warehouse:
 | Client's independent count | 2,007,069 — **matches the platform exactly** |
 | Errors | **0** |
 | Result-cache hit rate | **98.8%** (warms to 99.5%) |
-| Sustained throughput | **~525 QPS ≈ ~1.9M queries/hour** (peak 30 s: **550**) |
+| Sustained throughput | **≈525 QPS ≈ 1.9M queries/hour** (peak 30 s: **550**) |
 | Latency p50 / p95 | **356 ms / 1.7 s** |
 | Warehouse | Serverless SQL, autoscaling |
-| Cost (measured) | **~$85 per million queries** |
+| Cost (measured) | **≈$85 per million queries** |
 
-**Honest timing.** At the measured ceiling this is **~1.9M queries in a clean hour;
-2,000,000 takes ~63 minutes.** The number that matters is the *rate* — ~1.9M/hour
+**Honest timing.** At the measured ceiling this is **≈1.9M queries in a clean hour;
+2,000,000 takes ≈63 minutes.** The number that matters is the *rate* — ≈1.9M/hour
 of tagged, audited, application-scale `SELECT`s from one serverless warehouse — and
 that every single query is accounted for in Databricks' own audit log, matching the
 generator's independent count to the query.
@@ -39,7 +39,7 @@ generator's independent count to the query.
 
 The most important operational finding, and a correction to an earlier assumption
 in this repo. We drove the workload every way we could, and throughput
-**converged on the same ~550 QPS ceiling regardless of cache mode, warehouse count,
+**converged on the same ≈550 QPS ceiling regardless of cache mode, warehouse count,
 warehouse size, or query mix.** Peak sustained 30-second rate, from
 `system.query.history`:
 
@@ -54,12 +54,12 @@ warehouse size, or query mix.** Peak sustained 30-second rate, from
 **Two warehouses serve no faster than one** (551 vs 550); three are no faster than
 two. The bottleneck is **per-query compilation/planning**, which behaves as a
 *shared* control-plane resource here: when multiple warehouses drive load together,
-compile time balloons (**~270 ms → ~1,400 ms**) so the *total* stays pinned at
-~550 QPS while each warehouse's share drops proportionally — two warehouses settle
-at **~262 QPS each**. Execution time is **not** the limit; it is small (and
+compile time balloons (**≈270 ms → ≈1,400 ms**) so the *total* stays pinned at
+≈550 QPS while each warehouse's share drops proportionally — two warehouses settle
+at **≈262 QPS each**. Execution time is **not** the limit; it is small (and
 near-zero on cache hits). The tell is unmistakable: in the 3-warehouse run, a
-warehouse running *alone* had ~500 ms compile, while two warehouses *overlapping*
-had ~1,400 ms each — same hardware, different contention.
+warehouse running *alone* had ≈500 ms compile, while two warehouses *overlapping*
+had ≈1,400 ms each — same hardware, different contention.
 
 > **Environment caveat — read before quoting this.** This shared ceiling is almost
 > certainly a characteristic of **this specific (FE-VM demo) workspace's shared
@@ -76,28 +76,28 @@ had ~1,400 ms each — same hardware, different contention.
 ## Cache on vs off — same ceiling, very different economics
 
 Because throughput is compile-bound, **the result cache does not raise the
-throughput ceiling** — both modes top out at ~550 QPS. What the cache changes is
+throughput ceiling** — both modes top out at ≈550 QPS. What the cache changes is
 **cost and latency**: it makes execution nearly free, so you reach the ceiling with
 a fraction of the compute.
 
 | | **Serving (cache on)** | **Cache off** |
 |---|---|---|
 | Result-cache hit rate | 94–99% | **0%** |
-| Execution per query | **~3–33 ms** (near-free) | 122–240 ms (real scan) |
-| Latency p50 | **356 ms** | 678 ms → ~1 s |
-| Peak throughput | ~550 QPS | ~550 QPS — **the same** |
-| Compute to reach the ceiling | **one warehouse (~20 clusters)** | **two warehouses (~80 clusters)** |
-| Cost per 2M queries | **~$85** | **~$500 (~6×)** |
+| Execution per query | **≈3–33 ms** (near-free) | 122–240 ms (real scan) |
+| Latency p50 | **356 ms** | 678 ms → ≈1 s |
+| Peak throughput | ≈550 QPS | ≈550 QPS — **the same** |
+| Compute to reach the ceiling | **one warehouse (≈20 clusters)** | **two warehouses (≈80 clusters)** |
+| Cost per 2M queries | **≈$85** | **≈$500 (≈6×)** |
 
-With the cache **off**, every query does real work — measured ~1 s end-to-end
-(~300 ms compile + ~240 ms execution + fetch/queue) — so a single Small warehouse
-is *cluster*-limited to **~407 QPS** and you need a **second** warehouse just to
-reach the same ~550 ceiling the cache hits on one. You pay for ~4× the clusters
+With the cache **off**, every query does real work — measured ≈1 s end-to-end
+(≈300 ms compile + ≈240 ms execution + fetch/queue) — so a single Small warehouse
+is *cluster*-limited to **≈407 QPS** and you need a **second** warehouse just to
+reach the same ≈550 ceiling the cache hits on one. You pay for ≈4× the clusters
 **and** for real execution on every query: roughly **6× the cost for identical
 throughput and worse latency.**
 
 **This is the case for the cache-backed serving pattern.** It does not make the
-warehouse faster at its ceiling — it makes serving ~1.9M queries/hour *cheap and
+warehouse faster at its ceiling — it makes serving ≈1.9M queries/hour *cheap and
 low-latency* instead of expensive and slow.
 
 > Turn the cache off only when queries are genuinely unique, or the underlying data
@@ -116,14 +116,14 @@ per-cluster DBU rate — making **Small the cost-optimal size**:
 
 | size (serving) | ≈ $ / 1M queries | ≈ $ / 2M queries |
 |---|---|---|
-| **Small** (recommended) | **~$42** | **~$85** |
-| Medium (measured) | ~$85 | ~$170 |
-| Large | ~$140 | ~$285 |
+| **Small** (recommended) | **≈$42** | **≈$85** |
+| Medium (measured) | ≈$85 | ≈$170 |
+| Large | ≈$140 | ≈$285 |
 
-**Cache-off costs ~6× more for the same throughput:** reaching the ~550 QPS ceiling
-with the cache off took **two** Small warehouses at ~40 clusters each (~80 clusters,
+**Cache-off costs ≈6× more for the same throughput:** reaching the ≈550 QPS ceiling
+with the cache off took **two** Small warehouses at ≈40 clusters each (≈80 clusters,
 mostly compile-starved) plus real execution on every query — on the order of
-**~$500 per 2M queries** versus ~$85 served from cache.
+**≈$500 per 2M queries** versus ≈$85 served from cache.
 
 ---
 
@@ -131,8 +131,8 @@ mostly compile-starved) plus real execution on every query — on the order of
 
 Pushing a single warehouse as hard as possible (serving mode, several distributed
 generator instances) served **2,756,577** queries at 99.5% cache — but the
-*sustained rate held at ~525 QPS*, the same ceiling, over a longer window. You can
-serve an arbitrarily large *total* by running longer; you cannot exceed the ~550 QPS
+*sustained rate held at ≈525 QPS*, the same ceiling, over a longer window. You can
+serve an arbitrarily large *total* by running longer; you cannot exceed the ≈550 QPS
 *rate* by adding warehouses.
 
 ---
@@ -140,19 +140,19 @@ serve an arbitrarily large *total* by running longer; you cannot exceed the ~550
 ## Scaling the load generator (to reach the ceiling)
 
 The warehouse ceiling only binds once the *client* can push that hard. One
-generator node tops out around **~130–150 QPS** (Python/connection overhead):
+generator node tops out around **≈130–150 QPS** (Python/connection overhead):
 
 | generator (one node) | achieved QPS |
 |---|---|
-| 32 threads | ~116 |
-| 120 threads | ~152 |
-| 320 threads | ~133 |
+| 32 threads | ≈116 |
+| 120 threads | ≈152 |
+| 320 threads | ≈133 |
 
-So reaching ~550 QPS needs **~4–5 generator instances sharing one run tag** —
-`system.query.history` aggregates them into a single proven count. Beyond ~5
+So reaching ≈550 QPS needs **≈4–5 generator instances sharing one run tag** —
+`system.query.history` aggregates them into a single proven count. Beyond ≈5
 generators you stop gaining, because the shared **warehouse-side** compile ceiling
 (above) now binds, not the client. (Note: launching many generator jobs at once can
-stagger — this workspace's serverless job-compute pool spun up ~10 at a time — which
+stagger — this workspace's serverless job-compute pool spun up ≈10 at a time — which
 also drags real wall-clock throughput on the biggest runs.)
 
 ---

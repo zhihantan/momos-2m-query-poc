@@ -1,13 +1,13 @@
-# Tuning guide — how to reach the throughput ceiling (measured: ~550 QPS)
+# Tuning guide — how to reach the throughput ceiling (measured: ≈550 QPS)
 
 ## 1. Scale OUT, not UP
 
 For **many small queries**, adding *clusters* beats a bigger *size*.
 
-- Databricks targets roughly **~10 concurrent queries per cluster** before it
+- Databricks targets roughly **≈10 concurrent queries per cluster** before it
   queues and scales out. So a warehouse's concurrency ceiling ≈
   `max_num_clusters × 10`.
-- A **Small** warehouse with `max_num_clusters: 20` gives a ~200 concurrent-query
+- A **Small** warehouse with `max_num_clusters: 20` gives a ≈200 concurrent-query
   ceiling — plenty for 556 QPS of light queries.
 - A bigger *size* (Medium/Large) makes each individual query faster (more
   parallelism per query) but costs more per cluster-hour. Use it only if the
@@ -18,13 +18,13 @@ For **many small queries**, adding *clusters* beats a bigger *size*.
 headroom and variance.
 
 > **Measured caveat — the textbook model did *not* hold here.** We found throughput
-> **compile-bound at a shared ~550 QPS ceiling** that does **not** rise with more
+> **compile-bound at a shared ≈550 QPS ceiling** that does **not** rise with more
 > clusters, a bigger size, *or a second/third warehouse* — in **either** cache mode
 > (see §8 and [results.md](results.md#the-throughput-ceiling-is-shared--more-or-bigger-warehouses-dont-raise-it)).
 > When multiple warehouses drive load together, per-query compile balloons
-> (~270 ms → ~1,400 ms) so the *total* stays pinned at ~550 QPS. Even cache-off,
+> (≈270 ms → ≈1,400 ms) so the *total* stays pinned at ≈550 QPS. Even cache-off,
 > which the textbook model says should be execution-bound and scale out, turned out
-> compile-bound at scale (execution shrank to ~120 ms while compile dominated). This
+> compile-bound at scale (execution shrank to ≈120 ms while compile dominated). This
 > is almost certainly a **shared control-plane limit of this demo workspace**, not a
 > fundamental Serverless SQL property — re-verify on your target workspace.
 
@@ -47,7 +47,7 @@ chart `system.compute.warehouse_events.cluster_count` over the run.
 ## 3. Concurrency on the client
 
 In-flight concurrency ≈ `num_partitions × threads_per_partition`. Keep it near the
-warehouse ceiling (~150–200). Too little and you can't reach target QPS; too much
+warehouse ceiling (≈150–200). Too little and you can't reach target QPS; too much
 and queries queue (watch `waiting_at_capacity_duration_ms`).
 
 - `pace: true` targets a fixed QPS (for the "2M in 60 min" headline).
@@ -80,7 +80,7 @@ results: `pruned_files / (pruned_files + read_files)`. Keep result sets tiny
 
 `src/workload/distributed.py` + notebook `04_run_benchmark_distributed.py` (job
 `momos_benchmark_distributed`) fan the per-thread loop across Spark **executors**
-via `mapInPandas`, so **one job** scales past the ~150 QPS single-node cap.
+via `mapInPandas`, so **one job** scales past the ≈150 QPS single-node cap.
 
 Two things make it work:
 - **The worker is self-contained.** Executor Python workers don't have `src` on
@@ -97,8 +97,8 @@ Two things make it work:
 On this FE-VM (serverless-only) workspace, serverless **did not scale
 `mapInPandas` across multiple nodes** for this I/O-bound job — it kept everything
 on **one node** (`count(distinct node) = 1`) and ran the partitions in *waves*
-(96 partitions × 180s ran in ~828s of wall time). Net: on serverless-only,
-`mapInPandas` maxes a single node (~220 QPS — a bit above the driver pool's ~150,
+(96 partitions × 180s ran in ≈828s of wall time). Net: on serverless-only,
+`mapInPandas` maxes a single node (≈220 QPS — a bit above the driver pool's ≈150,
 since it uses more cores), it does **not** give multi-node scale-out.
 
 So pick your generator by compute type:
@@ -108,7 +108,7 @@ So pick your generator by compute type:
 - **Serverless-only** (this workspace): use the **N-parallel-jobs** pattern
   instead — launch several `momos_benchmark` runs sharing one `run_tag`; each gets
   its own node, and `system.query.history` aggregates them (this is how the live
-  2M run hit ~528 QPS). For the distributed job here, set `num_partitions` ≈ one
+  2M run hit ≈528 QPS). For the distributed job here, set `num_partitions` ≈ one
   node's cores so it runs in a single wave rather than queuing.
 
 The distributed log (`benchmark_query_log_dist`) records the executor `node` per
@@ -127,29 +127,29 @@ multi-node — no waiting for `query.history` ingestion.
   (for cache-off runs) — which works because the connector holds a persistent session
   (the stateless Statement Execution API cannot do this).
 - **Use the connector, not the SDK Statement Execution API, for high QPS.** The
-  SDK's shared HTTP connection pool caps real concurrency (~10), so it tops out
-  around ~10–15 QPS regardless of threads. The connector opens one persistent
+  SDK's shared HTTP connection pool caps real concurrency (≈10), so it tops out
+  around ≈10–15 QPS regardless of threads. The connector opens one persistent
   connection per thread — no shared-pool cap — and reaches hundreds of QPS.
 - **Explicit DataFrame schemas when writing results.** Python `int` infers as
   Spark `long`; appending to an `INT` Delta column then fails to merge. The
   results tables use explicit schemas.
-- **A cache miss (cache off) has a ~700 ms–1 s per-query floor — and hits the same
+- **A cache miss (cache off) has a ≈700 ms–1 s per-query floor — and hits the same
   shared ceiling.** Measured on a Small serverless warehouse, even a point lookup
-  runs ~700 ms–1 s end-to-end: ~300 ms compilation (fixed planning overhead, *not*
-  removed by parameterized queries), ~240 ms execution, ~400 ms fetch/queue. A
-  single Small warehouse is *cluster*-limited to **~407 QPS** cache-off; a **second**
-  warehouse reaches ~550 QPS **but no further**, because compilation is the shared
+  runs ≈700 ms–1 s end-to-end: ≈300 ms compilation (fixed planning overhead, *not*
+  removed by parameterized queries), ≈240 ms execution, ≈400 ms fetch/queue. A
+  single Small warehouse is *cluster*-limited to **≈407 QPS** cache-off; a **second**
+  warehouse reaches ≈550 QPS **but no further**, because compilation is the shared
   ceiling (see §1 and [results.md](results.md#cache-on-vs-off--same-ceiling-very-different-economics)).
-  So cache-off buys **no extra throughput** over serving — it just costs ~6× more
-  (real execution on ~4× the clusters) and runs ~3× slower. Use the result cache for
+  So cache-off buys **no extra throughput** over serving — it just costs ≈6× more
+  (real execution on ≈4× the clusters) and runs ≈3× slower. Use the result cache for
   a serving layer; use cache-off only for genuinely unique / fresh-data queries or to
   benchmark the raw engine.
-- **`system.query.history` ingests with a lag** (we saw ~8 min). The dashboard and
+- **`system.query.history` ingests with a lag** (we saw ≈8 min). The dashboard and
   the proof `COUNT(*)` are near-real-time-ish, not instant — wait a few minutes
   after a run for the authoritative numbers.
 - **The run-tag comment survives even for parameterized (`:name`) queries**, so the
   proof filter works regardless of literal-vs-bound parameters.
-- **One generator node caps ~130 QPS** (client-bound); reach higher QPS by running
+- **One generator node caps ≈130 QPS** (client-bound); reach higher QPS by running
   N generator instances that share a `run_tag` (system.query.history aggregates
   them). This is the horizontal client scale-out the benchmark is built around.
 
