@@ -61,13 +61,10 @@ For this cache-backed serving workload, the cost-optimal Serverless SQL Warehous
 | **Clusters (timed run)** | warm floor min 4–6 | avoids the cold-start ramp eating into the window |
 | **Auto-stop** | 10 min | ~$0 when idle |
 
-One Small warehouse serves **~1.9M queries/hour at ~$85/million** and reaches the
-workspace's ~550 QPS ceiling on its own. **Adding warehouses does not raise the
-rate** — we measured one, two, and three warehouses (both cache-on and cache-off)
-all pinned at ~550 QPS, because compilation is a *shared* control-plane resource on
-this workspace (see [docs/results.md](docs/results.md#the-throughput-ceiling-is-shared--more-or-bigger-warehouses-dont-raise-it)).
-So the recommended config is **one Small warehouse**; 2M lands in ~63 min. This
-shared ceiling is likely specific to this demo workspace — **re-verify on yours.**
+One Small warehouse reaches the ~550 QPS ceiling on its own — **~1.9M queries/hour
+at ~$85/million, 2M in ~63 min.** Adding warehouses doesn't raise the rate (measured
+1/2/3 warehouses, cache-on and cache-off, all ~550 QPS — compilation is a *shared*
+control-plane resource; see [docs/results.md](docs/results.md#the-throughput-ceiling-is-shared--more-or-bigger-warehouses-dont-raise-it)).
 
 ---
 
@@ -127,7 +124,7 @@ your workspace.
 ./scripts/run_benchmark.sh smoke
 #   -> job runs the load generator, then 03_analyze_results prints the metrics
 
-# 3) The headline: generate full-scale data, warm the warehouse, run 2M/60min
+# 3) The headline: generate full-scale data, warm the warehouse, run the full benchmark
 databricks bundle run momos_generate_data -t dev -p your-profile --params scale=full
 #   set a warm floor (min clusters) — see docs/tuning.md — then:
 ./scripts/run_benchmark.sh full serving  # serving mode (result cache)
@@ -151,13 +148,14 @@ databricks bundle run momos_benchmark_distributed -t dev -p your-profile
 > from one job. On a **serverless-only** workspace, serverless kept it on **one
 > node** (no multi-node scale-out for this I/O-bound job), so there the reliable
 > way to multi-node is the **N-parallel-jobs** pattern (several `momos_benchmark`
-> runs sharing a `run_tag`) — which is how the live 2M run reached ~528 QPS.
+> runs sharing a `run_tag`) — which is how the live 2M run reached ~525 QPS.
 
 ### The dashboard
 
-The bundle deploys an **AI/BI dashboard** ("Momos · 2M Queries") that auto-targets
-the latest run: cumulative-count race to 2M, QPS timeline, latency percentiles,
-the autoscaling curve, and cache-hit rate.
+The bundle deploys an **AI/BI dashboard** ("Momos — 2M Queries on Serverless SQL"):
+cumulative-count race to 2M, QPS timeline, latency percentiles, the autoscaling
+curve, and cache-hit rate. Its datasets target the flagship `run_tag`
+(`momos_2M_serving`) — change it to feature another run.
 
 ---
 
@@ -215,13 +213,10 @@ lowest price:
 | Medium (measured) | ~$85 | ~$170 |
 | Large | ~$140 | ~$285 |
 
-**Turning the cache off costs ~6× more for the same throughput.** Reaching the same
-~550 QPS ceiling with the result cache off took **two** Small warehouses (~80
-clusters, mostly compile-starved) plus real execution on every query — on the order
-of **~$500 per 2M** versus ~$85 served from cache. Likewise, pushing one warehouse
-to 40 clusters for peak throughput is over-provisioned for cache hits (execution is
-nearly free). For a cache-served serving layer, a **Small** warehouse at the ~550
-QPS ceiling moves queries cheapest.
+**Turning the cache off costs ~6× more for the same throughput** (~$500 vs ~$85 per
+2M): reaching the same ~550 QPS ceiling cache-off took two Small warehouses (~80
+mostly compile-starved clusters) plus real execution on every query. For a
+cache-served serving layer, a **Small** warehouse moves queries cheapest.
 
 ## Cleanup
 
