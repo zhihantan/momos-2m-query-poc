@@ -2,27 +2,27 @@
   "datasets": [
     {
       "name": "ds_headline",
-      "displayName": "Headline (latest run)",
+      "displayName": "Headline (2M flagship run)",
       "queryLines": [
-        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = (SELECT run_tag FROM zh_serverless_ws.momos_cx.benchmark_runs ORDER BY start_ts DESC LIMIT 1) GROUP BY run_tag), ",
+        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = 'momos_2M_serving' GROUP BY run_tag), ",
         "h AS (SELECT q.* FROM system.query.history q, latest l ",
         "  WHERE q.statement_text LIKE ('/* ' || l.run_tag || ' %') ",
-        "    AND q.start_time BETWEEN l.start_ts - INTERVAL 5 MINUTES AND l.end_ts + INTERVAL 5 MINUTES) ",
-        "SELECT count(*) AS total_queries, ",
-        "  round(count(*) / nullif(unix_timestamp(max(end_time)) - unix_timestamp(min(start_time)), 0), 1) AS achieved_qps, ",
-        "  round((unix_timestamp(max(end_time)) - unix_timestamp(min(start_time))) / 60.0, 1) AS span_min, ",
-        "  percentile_approx(total_duration_ms, 0.5) AS p50_ms, ",
-        "  percentile_approx(total_duration_ms, 0.99) AS p99_ms, ",
-        "  round(avg(CASE WHEN from_result_cache THEN 1 ELSE 0 END) * 100, 1) AS cache_hit_pct, ",
-        "  round(sum(read_bytes) / 1e9, 2) AS gb_read ",
-        "FROM h"
+        "    AND q.start_time BETWEEN l.start_ts - INTERVAL 5 MINUTES AND l.end_ts + INTERVAL 5 MINUTES), ",
+        "per_sec AS (SELECT date_trunc('SECOND', start_time) AS s, count(*) AS c FROM h GROUP BY 1) ",
+        "SELECT (SELECT count(*) FROM h) AS total_queries, ",
+        "  (SELECT round(percentile(c, 0.5), 1) FROM per_sec WHERE c > 5) AS achieved_qps, ",
+        "  (SELECT round((unix_timestamp(max(end_time)) - unix_timestamp(min(start_time))) / 60.0, 1) FROM h) AS span_min, ",
+        "  (SELECT percentile_approx(total_duration_ms, 0.5) FROM h) AS p50_ms, ",
+        "  (SELECT percentile_approx(total_duration_ms, 0.99) FROM h) AS p99_ms, ",
+        "  (SELECT round(avg(CASE WHEN from_result_cache THEN 1 ELSE 0 END) * 100, 1) FROM h) AS cache_hit_pct, ",
+        "  (SELECT round(sum(read_bytes) / 1e9, 2) FROM h) AS gb_read"
       ]
     },
     {
       "name": "ds_qps",
       "displayName": "QPS over time",
       "queryLines": [
-        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = (SELECT run_tag FROM zh_serverless_ws.momos_cx.benchmark_runs ORDER BY start_ts DESC LIMIT 1) GROUP BY run_tag) ",
+        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = 'momos_2M_serving' GROUP BY run_tag) ",
         "SELECT date_trunc('SECOND', q.start_time) AS ts, count(*) AS qps ",
         "FROM system.query.history q, latest l ",
         "WHERE q.statement_text LIKE ('/* ' || l.run_tag || ' %') ",
@@ -34,7 +34,7 @@
       "name": "ds_cumulative",
       "displayName": "Cumulative queries",
       "queryLines": [
-        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = (SELECT run_tag FROM zh_serverless_ws.momos_cx.benchmark_runs ORDER BY start_ts DESC LIMIT 1) GROUP BY run_tag), ",
+        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = 'momos_2M_serving' GROUP BY run_tag), ",
         "per_sec AS (SELECT date_trunc('SECOND', q.start_time) AS ts, count(*) AS qps ",
         "  FROM system.query.history q, latest l ",
         "  WHERE q.statement_text LIKE ('/* ' || l.run_tag || ' %') ",
@@ -48,7 +48,7 @@
       "name": "ds_per_template",
       "displayName": "Per-template",
       "queryLines": [
-        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = (SELECT run_tag FROM zh_serverless_ws.momos_cx.benchmark_runs ORDER BY start_ts DESC LIMIT 1) GROUP BY run_tag) ",
+        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = 'momos_2M_serving' GROUP BY run_tag) ",
         "SELECT regexp_extract(q.statement_text, 'tpl=([a-zA-Z0-9_]+)', 1) AS template_id, ",
         "  count(*) AS queries, ",
         "  percentile_approx(total_duration_ms, 0.5) AS p50_ms, ",
@@ -63,7 +63,7 @@
       "name": "ds_scaling",
       "displayName": "Warehouse autoscaling",
       "queryLines": [
-        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = (SELECT run_tag FROM zh_serverless_ws.momos_cx.benchmark_runs ORDER BY start_ts DESC LIMIT 1) GROUP BY run_tag), ",
+        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = 'momos_2M_serving' GROUP BY run_tag), ",
         "whid AS (SELECT DISTINCT q.compute.warehouse_id AS wid FROM system.query.history q, latest l ",
         "  WHERE q.statement_text LIKE ('/* ' || l.run_tag || ' %') AND q.compute.warehouse_id IS NOT NULL) ",
         "SELECT we.event_time AS ts, we.cluster_count AS clusters ",
@@ -77,7 +77,7 @@
       "name": "ds_cache",
       "displayName": "Cache hit vs compute",
       "queryLines": [
-        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = (SELECT run_tag FROM zh_serverless_ws.momos_cx.benchmark_runs ORDER BY start_ts DESC LIMIT 1) GROUP BY run_tag) ",
+        "WITH latest AS (SELECT run_tag, min(start_ts) AS start_ts, max(end_ts) AS end_ts FROM zh_serverless_ws.momos_cx.benchmark_runs WHERE run_tag = 'momos_2M_serving' GROUP BY run_tag) ",
         "SELECT CASE WHEN q.from_result_cache THEN 'cache hit' ELSE 'compute' END AS source, count(*) AS queries ",
         "FROM system.query.history q, latest l ",
         "WHERE q.statement_text LIKE ('/* ' || l.run_tag || ' %') ",
@@ -97,7 +97,7 @@
   "pages": [
     {
       "name": "overview",
-      "displayName": "2M Queries / 60 min",
+      "displayName": "2M Queries · Serverless SQL",
       "pageType": "PAGE_TYPE_CANVAS",
       "layout": [
         {
@@ -105,7 +105,7 @@
           "position": {"x": 0, "y": 0, "width": 6, "height": 1}
         },
         {
-          "widget": {"name": "subtitle", "multilineTextboxSpec": {"lines": ["Latest run — counted and measured from system.query.history (the platform's own audit log)."]}},
+          "widget": {"name": "subtitle", "multilineTextboxSpec": {"lines": ["The 2,007,069-query flagship run — counted and measured from system.query.history (the platform's own audit log)."]}},
           "position": {"x": 0, "y": 1, "width": 6, "height": 1}
         },
         {
@@ -113,7 +113,7 @@
           "position": {"x": 0, "y": 2, "width": 2, "height": 3}
         },
         {
-          "widget": {"name": "kpi-qps", "queries": [{"name": "main_query", "query": {"datasetName": "ds_headline", "fields": [{"name": "achieved_qps", "expression": "`achieved_qps`"}], "disaggregated": true}}], "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "achieved_qps", "displayName": "Achieved QPS"}}, "frame": {"showTitle": true, "title": "Achieved QPS"}}},
+          "widget": {"name": "kpi-qps", "queries": [{"name": "main_query", "query": {"datasetName": "ds_headline", "fields": [{"name": "achieved_qps", "expression": "`achieved_qps`"}], "disaggregated": true}}], "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "achieved_qps", "displayName": "Sustained QPS"}}, "frame": {"showTitle": true, "title": "Sustained QPS (per-sec p50)"}}},
           "position": {"x": 2, "y": 2, "width": 2, "height": 3}
         },
         {

@@ -17,9 +17,12 @@ databricks:
 
 # ----------------------------------------------------------------------
 # Serverless SQL Warehouse under test
-# Design note: for MANY SMALL queries you scale OUT (more clusters), not
-# UP (bigger size). Databricks targets ~10 concurrent queries per cluster,
-# so max_clusters * 10 is the concurrency ceiling.
+# Design note: the textbook advice for MANY SMALL queries is to scale OUT
+# (more clusters), not UP (bigger size); Databricks targets ~10 concurrent
+# queries per cluster. MEASURED REALITY on this workspace: throughput is
+# compile-bound at a shared ~550 QPS ceiling that does NOT rise with clusters,
+# size, or more warehouses (see docs/results.md) — very likely a shared
+# control-plane limit of this demo workspace, so re-verify on your own.
 # ----------------------------------------------------------------------
 warehouse:
   name: momos-benchmark-wh

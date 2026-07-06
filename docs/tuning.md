@@ -1,4 +1,4 @@
-# Tuning guide — how to actually hit 556 QPS (and go beyond)
+# Tuning guide — how to reach the throughput ceiling (measured: ~550 QPS)
 
 ## 1. Scale OUT, not UP
 
@@ -17,12 +17,16 @@ For **many small queries**, adding *clusters* beats a bigger *size*.
 `~10 / 0.15 ≈ 66 QPS`. For 556 QPS you need `~9` clusters; configure `max=20` for
 headroom and variance.
 
-> **Measured caveat:** the above is the textbook model. In *serving mode* (cache
-> hits) we found throughput is **compile-bound at ~520–550 QPS per warehouse** and
-> does **not** rise with more clusters or a bigger size (see §8 and
-> [results.md](results.md#cost--performance)). The scale-out model applies to
-> workloads that scan fresh data (cache off), where execution — not planning — is
-> the bottleneck.
+> **Measured caveat — the textbook model did *not* hold here.** We found throughput
+> **compile-bound at a shared ~550 QPS ceiling** that does **not** rise with more
+> clusters, a bigger size, *or a second/third warehouse* — in **either** cache mode
+> (see §8 and [results.md](results.md#the-throughput-ceiling-is-shared--more-or-bigger-warehouses-dont-raise-it)).
+> When multiple warehouses drive load together, per-query compile balloons
+> (~270 ms → ~1,400 ms) so the *total* stays pinned at ~550 QPS. Even cache-off,
+> which the textbook model says should be execution-bound and scale out, turned out
+> compile-bound at scale (execution shrank to ~120 ms while compile dominated). This
+> is almost certainly a **shared control-plane limit of this demo workspace**, not a
+> fundamental Serverless SQL property — re-verify on your target workspace.
 
 ## 2. Use a warm floor for the timed run
 
@@ -129,12 +133,17 @@ multi-node — no waiting for `query.history` ingestion.
 - **Explicit DataFrame schemas when writing results.** Python `int` infers as
   Spark `long`; appending to an `INT` Delta column then fails to merge. The
   results tables use explicit schemas.
-- **A cache miss (cache off) has a ~1s per-query floor.** Measured on a Small
-  serverless warehouse, even a point lookup runs ~1s end-to-end: ~270ms
-  compilation (fixed planning overhead, *not* removed by parameterized queries),
-  ~300ms execution, ~400ms fetch/queue. So **cache-off throughput is capped by
-  `max_clusters × 10 ÷ 1s`** (~300 QPS at 30 clusters) and scales with size/clusters;
-  the result cache sidesteps this floor and is how you reach app-scale QPS cheaply.
+- **A cache miss (cache off) has a ~700 ms–1 s per-query floor — and hits the same
+  shared ceiling.** Measured on a Small serverless warehouse, even a point lookup
+  runs ~700 ms–1 s end-to-end: ~300 ms compilation (fixed planning overhead, *not*
+  removed by parameterized queries), ~240 ms execution, ~400 ms fetch/queue. A
+  single Small warehouse is *cluster*-limited to **~407 QPS** cache-off; a **second**
+  warehouse reaches ~550 QPS **but no further**, because compilation is the shared
+  ceiling (see §1 and [results.md](results.md#cache-on-vs-off--same-ceiling-very-different-economics)).
+  So cache-off buys **no extra throughput** over serving — it just costs ~6× more
+  (real execution on ~4× the clusters) and runs ~3× slower. Use the result cache for
+  a serving layer; use cache-off only for genuinely unique / fresh-data queries or to
+  benchmark the raw engine.
 - **`system.query.history` ingests with a lag** (we saw ~8 min). The dashboard and
   the proof `COUNT(*)` are near-real-time-ish, not instant — wait a few minutes
   after a run for the authoritative numbers.
